@@ -1,0 +1,18 @@
+# Python
+.venv/
+__pycache__/
+
+# Builds (PyInstaller)
+build/
+dist/
+*.spec
+
+# Your own saved scores and progress (each player keeps their own; starting_scores/ is what new players get)
+/scores.json
+/state_scores.json
+/guess_scores.json
+/capital_guess_scores.json
+/flag_progress.json
+
+# macOS
+.DS_Store

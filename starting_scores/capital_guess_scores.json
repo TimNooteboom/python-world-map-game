@@ -1,0 +1,40 @@
+{
+  "scores": [
+    {
+      "countries": 46,
+      "seconds": 300.0,
+      "name": "Tim",
+      "date": "2026-10-07"
+    },
+    {
+      "countries": 45,
+      "seconds": 300.0,
+      "name": "Tim",
+      "date": "2026-10-07"
+    },
+    {
+      "countries": 45,
+      "seconds": 300.0,
+      "name": "Tim",
+      "date": "2026-10-07"
+    },
+    {
+      "countries": 42,
+      "seconds": 300.0,
+      "name": "Tim",
+      "date": "2026-10-07"
+    },
+    {
+      "countries": 36,
+      "seconds": 300.0,
+      "name": "Tim",
+      "date": "2026-10-07"
+    },
+    {
+      "countries": 30,
+      "seconds": 300.0,
+      "name": "Tim",
+      "date": "2026-10-07"
+    }
+  ]
+}
