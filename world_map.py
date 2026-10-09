@@ -113,6 +113,9 @@ INSET_BOXES = [(-127.6, 16.3, -111.6, 28.6), (-110.8, 16.3, -103.8, 20.8)]  # fr
 NE_VIEW = (-80.5, 37.3, -66.5, 47.6)
 NE_SMALL = {"Rhode Island", "Delaware", "Connecticut", "New Jersey", "Massachusetts", "New Hampshire",
             "Vermont", "Maryland"}
+# Top-to-bottom order of their tags in the column off the coast (States game and guess games).
+NE_CALLOUT_ORDER = ["Vermont", "New Hampshire", "Massachusetts", "Rhode Island", "Connecticut", "New Jersey",
+                    "Delaware", "Maryland"]
 
 # Finishing a continent in the country game moves you on to the next unfinished one, in this order.
 CONTINENT_ORDER = ["North America", "South America", "Europe", "Africa", "Asia", "Oceania"]
@@ -365,9 +368,17 @@ def save_progress(perfect):
         json.dump(data, f, indent=2)
 
 
+SCORE_FIELDS = ("countries", "states", "capitals")  # what a saved score counts, depending on the board
+
+
+def score_count(score):
+    """How many countries / states / capitals a saved score got."""
+    return next((score[k] for k in SCORE_FIELDS if k in score), 0)
+
+
 def rank_key(score):
     # Most countries first; ties go to whoever was faster.
-    return (-score["countries"], score["seconds"])
+    return (-score_count(score), score["seconds"])
 
 
 def fmt_date(iso):
@@ -420,6 +431,8 @@ class Scope:
         self.noun, self.nouns = noun, nouns  # "country"/"countries" or "state"/"states"
         self.time_limit, self.score_files, self.board_title = time_limit, score_files, board_title
         self.score_label = score_label or nouns.title()  # scoreboard column: "Countries", "States", "Correct"
+        # Key a saved score uses for the count: "countries", "states" (States game, Guess the State) or "capitals".
+        self.score_field = {"world": "countries", "guess_capital": "capitals"}.get(key, "states")
         self.card_corner = card_corner  # where the Learn card goes without covering the map
         self.progress_prefix = "" if self.has_world else "us_"
         # Game in progress (see App.reset_game_state), kept while you play other modes.
@@ -619,7 +632,7 @@ class App:
         done = self.total_found()
         # Saved to a tenth of a second (cut off, not rounded, so it never shows more than the clock did).
         elapsed = self.scope.time_limit - self.time_left
-        self.result = {"countries": done, "seconds": math.floor(elapsed * 10) / 10}
+        self.result = {self.scope.score_field: done, "seconds": math.floor(elapsed * 10) / 10}
         sc = self.scope
         if self.guess_game():
             start = "Time's up" if self.time_left <= 0 else "Done"
@@ -1184,10 +1197,10 @@ class App:
         r = self.result
         if self.guess_game():
             title = "Time's up!" if self.time_left <= 0 else "All 50 answered!"
-            score = f"{r['countries']} / 50 correct in {fmt_time(r['seconds'])}"
+            score = f"{score_count(r)} / 50 correct in {fmt_time(r['seconds'])}"
         else:
             title = "Time's up!" if self.time_left <= 0 else f"You named every {self.scope.noun}!"
-            score = f"{r['countries']} {self.scope.nouns} in {fmt_time(r['seconds'])}"
+            score = f"{score_count(r)} {self.scope.nouns} in {fmt_time(r['seconds'])}"
         lines = [
             (self.big, title, TEXT),
             (self.font, score, FOUND),
@@ -1226,13 +1239,13 @@ class App:
             mine = sc == self.new_score
             if mine:
                 pygame.draw.rect(self.screen, (60, 90, 70), (card.x + 28, y - 4, card.w - 56, 32), border_radius=6)
-            values = [str(i), sc["name"], str(sc["countries"]), fmt_time(sc["seconds"]), fmt_date(sc.get("date", ""))]
+            values = [str(i), sc["name"], str(score_count(sc)), fmt_time(sc["seconds"]), fmt_date(sc.get("date", ""))]
             for (x, _), value in zip(cols, values):
                 img = self.font.render(value, True, FOUND if mine else TEXT)
                 self.screen.blit(img, (x, y), pygame.Rect(0, 0, 200, 30))
             y += 36
         if self.new_score and self.new_score not in top:
-            note = self.small.render(f"Your score ({self.new_score['countries']} in "
+            note = self.small.render(f"Your score ({score_count(self.new_score)} in "
                                      f"{fmt_time(self.new_score['seconds'])}) didn't make the top 10.", True, TEXT_DIM)
             self.screen.blit(note, note.get_rect(midtop=(card.centerx, card.bottom - 92)))
         if self.modal == "leaderboard":  # opened from the Leaderboard button mid-game
@@ -1306,8 +1319,19 @@ class App:
         shown.sort(key=lambda c: (c.bbox[2] - c.bbox[0]) * (c.bbox[3] - c.bbox[1]))
         bounds = pygame.Rect(4, 4, WIDTH - 8, MAP_H - 8)
         placed = []
+        # States game / guess games: the small northeastern states get their tag out in the Atlantic, joined by a line,
+        # so the tags don't cover their neighbours. Placed first, so other tags keep clear of them.
+        callouts = self.ne_callout_slots(view)
+        shown.sort(key=lambda c: c.name not in callouts)
         for c in shown:
             ax, ay = view.project_ring([c.label_pt])[0]
+            if c.name in callouts:
+                text = self.label_font.render(c.capital if self.capital_guess() else c.short_name, True, TEXT)
+                rect = text.get_rect().inflate(10, 4)
+                rect.midleft = callouts[c.name]
+                bg = FOUND_LABEL if c.found else MISSED if getattr(c, "missed", False) else PANEL
+                placed.append((rect, text, (ax, ay), bg))
+                continue
             # Guess the Capital labels states with their capital.
             text = self.label_font.render(c.capital if self.capital_guess() else c.short_name, True, TEXT)
             rect = text.get_rect().inflate(10, 4)
@@ -1325,6 +1349,16 @@ class App:
             bg = FOUND_LABEL if c.found else MISSED if getattr(c, "missed", False) else PANEL
             placed.append((rect.copy(), text, (ax, ay), bg))
         return placed
+
+    def ne_callout_slots(self, view):
+        """{state name: (x, y) where its tag starts} for the NE_SMALL states in the States game and guess games.
+
+        One fixed slot per state, in a column in the ocean, in NE_CALLOUT_ORDER.
+        """
+        states_game = self.naming_game() and self.continent == "USA"
+        if not (states_game or self.guess_game()) or self.ne_zoomed():  # full USA map only
+            return {}
+        return {name: (1060, 205 + i * 30) for i, name in enumerate(NE_CALLOUT_ORDER)}
 
     @staticmethod
     def label_offsets():
