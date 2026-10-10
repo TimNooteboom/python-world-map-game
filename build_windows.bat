@@ -24,9 +24,13 @@ if errorlevel 1 (
 )
 
 echo Building the game...
+rem Bundle starting scoreboards only if the folder is here (it isn't in the GitHub download).
+set "SCORES="
+if exist starting_scores\ set "SCORES=--add-data=starting_scores;starting_scores"
+
 pyinstaller --noconfirm --windowed --onefile --name "World Map Game" ^
   --add-data "countries.geojson;." --add-data "capitals.json;." --add-data "us_states.geojson;." ^
-  --add-data "flags;flags" --add-data "starting_scores;starting_scores" world_map.py
+  --add-data "flags;flags" %SCORES% world_map.py
 if errorlevel 1 (
     echo The build failed - see the messages above.
     pause
