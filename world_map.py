@@ -328,18 +328,28 @@ def draw_map(countries, view, colour_for, highlight=None):
 
 
 def load_scores(path, starting=None):
-    """(scores, last name typed). With no saved scores yet, start from the bundled starting scores."""
-    for p in (path, starting):
-        if not p:
-            continue
+    """(top 10 scores, last name typed) for a board.
+
+    The player's saved scores are merged with the bundled starting scores, so a new version of the
+    game brings its newest starting scores to players who already have scores of their own.
+    """
+    def read(p):
         try:
             with open(p, encoding="utf-8") as f:
-                data = json.load(f)
-        except (OSError, ValueError):
-            continue
-        # The starting scores' name isn't pre-filled: it's someone else's.
-        return data.get("scores", []), data.get("last_name", "") if p == path else ""
-    return [], ""
+                return json.load(f)
+        except (OSError, ValueError, TypeError):
+            return {}
+
+    saved = read(path) if path else {}
+    bundled = read(starting) if starting else {}
+    merged, seen = [], set()
+    for score in saved.get("scores", []) + bundled.get("scores", []):
+        key = (score.get("name"), score_count(score), score.get("seconds"), score.get("date"))
+        if key not in seen:  # the same score can be in both files
+            seen.add(key)
+            merged.append(score)
+    # Only the player's own last-typed name is pre-filled, never the starting scores' names.
+    return sorted(merged, key=rank_key)[:10], saved.get("last_name", "")
 
 
 def save_scores(path, scores, last_name):
@@ -633,6 +643,13 @@ class App:
         # Saved to a tenth of a second (cut off, not rounded, so it never shows more than the clock did).
         elapsed = self.scope.time_limit - self.time_left
         self.result = {self.scope.score_field: done, "seconds": math.floor(elapsed * 10) / 10}
+        if self.capital_guess():
+            # Reveal the capitals that weren't reached before time ran out, in red like the misses.
+            for c in self.guess_order[self.guess_index:]:
+                c.missed = True
+            self.guess_index = len(self.guess_order)
+            self.cont_view = View(USA_VIEW)
+            self.render_continent()
         sc = self.scope
         if self.guess_game():
             start = "Time's up" if self.time_left <= 0 else "Done"
