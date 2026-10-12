@@ -76,6 +76,7 @@ FPS = 60
 ZOOM_TIME = 0.6  # seconds
 TIME_LIMIT = 15 * 60  # seconds; the clock starts with the first correct answer
 STATE_TIME_LIMIT = 5 * 60  # the same for the States game
+WARNING_TIME = 30  # seconds left when the clock and its bar turn red
 
 # Colours
 OCEAN = (170, 205, 230)
@@ -1277,7 +1278,7 @@ class App:
         self.screen.blit(overlay, self.timer_rect)
         # Counts up from 0:00 to the time limit, which is shown next to it.
         elapsed = self.scope.time_limit - self.time_left
-        colour = MISSED if self.time_left <= 60 else TEXT
+        colour = MISSED if self.time_left <= WARNING_TIME else TEXT
         clock = self.big.render(fmt_time(elapsed), True, colour)
         limit = self.font.render(f" / {fmt_time(self.scope.time_limit)}", True, TEXT_DIM)
         row = pygame.Rect(0, 0, clock.get_width() + limit.get_width(), clock.get_height())
@@ -1287,7 +1288,7 @@ class App:
         # Progress bar towards the time limit.
         bar = pygame.Rect(self.timer_rect.x + 12, self.timer_rect.bottom - 10, self.timer_rect.w - 24, 4)
         pygame.draw.rect(self.screen, (80, 86, 98), bar, border_radius=2)
-        pygame.draw.rect(self.screen, colour if self.time_left <= 60 else FOUND,
+        pygame.draw.rect(self.screen, colour if self.time_left <= WARNING_TIME else FOUND,
                          (bar.x, bar.y, bar.w * elapsed / self.scope.time_limit, bar.h), border_radius=2)
         status = (self.over_label().rstrip("!").upper() if self.time_up else "PAUSED" if self.timer_paused()
                   else f"TIME ({self.scope.time_limit // 60} MIN MAX)" if self.timer_started else "STARTS ON 1ST ANSWER")
