@@ -1907,7 +1907,7 @@ class App:
     def draw_flag_quiz(self):
         q = self.quiz
         shade = pygame.Surface((WIDTH, MAP_H), pygame.SRCALPHA)
-        shade.fill((20, 22, 28, 170))
+        shade.fill((20, 22, 28, 110))  # dims the map, but keeps it visible behind the question
         self.screen.blit(shade, (0, 0))
         if q["done"]:
             self.draw_flag_game_done()
@@ -1926,7 +1926,8 @@ class App:
         mouse = pygame.mouse.get_pos()
         answered = q["picked"] is not None
         for i, (rect, c) in enumerate(zip(self.choice_rects(), q["choices"])):
-            pygame.draw.rect(self.screen, (58, 63, 74), rect, border_radius=10)
+            pygame.draw.rect(self.screen, (66, 72, 86), rect, border_radius=10)
+            pygame.draw.rect(self.screen, (140, 148, 165), rect, 2, border_radius=10)  # outline on every answer
             # Room for the name underneath is always kept, so nothing moves when the answer is shown.
             if capitals:
                 city = self.fit_text(self.name_font, c.capital, TEXT, rect.w - 24)
