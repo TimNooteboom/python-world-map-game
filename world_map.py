@@ -86,6 +86,7 @@ LAND_OTHER = (205, 205, 200)  # countries outside the selected continent
 BORDER = (110, 110, 110)
 FOUND = (70, 175, 90)
 FOUND_LABEL = (0, 0, 0)  # background of the name tag on a found country (black)
+OUTLINE = (140, 148, 165)  # border of quiz answers and Learn cards
 SELECTED = (95, 145, 215)  # country whose flag is shown in Flags > Learn
 MISSED = (215, 80, 80)
 PANEL = (40, 44, 52)
@@ -435,8 +436,7 @@ MENU = [("World", [("countries", "Countries", [("countries_learn", "Learn"), ("c
 class Scope:
     """One map you can play on (the world or the USA): its countries/states, game in progress and scores."""
 
-    def __init__(self, key, countries, views, noun, nouns, time_limit, score_files, board_title, card_corner,
-                 score_label=None):
+    def __init__(self, key, countries, views, noun, nouns, time_limit, score_files, board_title, score_label=None):
         self.key, self.countries, self.views = key, countries, views
         self.has_world = key == "world"  # the world has a globe view with continents to zoom into
         self.noun, self.nouns = noun, nouns  # "country"/"countries" or "state"/"states"
@@ -444,7 +444,6 @@ class Scope:
         self.score_label = score_label or nouns.title()  # scoreboard column: "Countries", "States", "Correct"
         # Key a saved score uses for the count: "countries", "states" (States game, Guess the State) or "capitals".
         self.score_field = {"world": "countries", "guess_capital": "capitals"}.get(key, "states")
-        self.card_corner = card_corner  # where the Learn card goes without covering the map
         self.progress_prefix = "" if self.has_world else "us_"
         # Game in progress (see App.reset_game_state), kept while you play other modes.
         self.continent = None  # None = world view
@@ -510,19 +509,18 @@ class App:
         states = [State(f) for f in state_features]
         self.scopes = {
             "world": Scope("world", countries, CONTINENT_VIEWS, "country", "countries", TIME_LIMIT,
-                           (SCORES_FILE, starting_scores("scores.json")), "Top 10 Scores", "top-left"),
+                           (SCORES_FILE, starting_scores("scores.json")), "Top 10 Scores"),
             "usa": Scope("usa", states, {"USA": USA_VIEW}, "state", "states", STATE_TIME_LIMIT,
-                         (STATE_SCORES_FILE, starting_scores("state_scores.json")), "Top 10 State Scores",
-                         "bottom-right"),
+                         (STATE_SCORES_FILE, starting_scores("state_scores.json")), "Top 10 State Scores"),
             # Its own copy of the states, so its green/red states and timer don't mix with the States game.
             "guess": Scope("guess", [State(f) for f in state_features], {"USA": USA_VIEW}, "state", "states",
                            STATE_TIME_LIMIT, (GUESS_SCORES_FILE, starting_scores("guess_scores.json")),
-                           "Top 10 Guess the State", "bottom-right",
+                           "Top 10 Guess the State",
                            score_label="Correct"),
             "guess_capital": Scope("guess_capital", [State(f) for f in state_features], {"USA": USA_VIEW},
                                    "capital", "capitals", STATE_TIME_LIMIT,
                                    (CAPITAL_GUESS_SCORES_FILE, starting_scores("capital_guess_scores.json")),
-                                   "Top 10 Guess the Capital", "bottom-right", score_label="Correct"),
+                                   "Top 10 Guess the Capital", score_label="Correct"),
         }
         self.scope = self.scopes["world"]
 
@@ -1697,17 +1695,11 @@ class App:
             return
         self.draw_country_highlight(c, LAND_HOVER, view, dots)
         name = self.fit_text(self.name_font, c.name, TEXT, 260)
-        card = pygame.Rect(0, 0, max(200, name.get_width() + 32), 172)
-        mx, my = pygame.mouse.get_pos()
-        card.topleft = (mx + 18, my + 18)
-        if card.right > WIDTH - 8:  # flip to the other side of the cursor near the edges
-            card.right = mx - 18
-        if card.bottom > MAP_H - 8:
-            card.bottom = my - 18
-        card.clamp_ip(pygame.Rect(0, 0, WIDTH, MAP_H))
+        card = self.learn_card(172, max(200, name.get_width() + 32))
         pill = pygame.Surface(card.size, pygame.SRCALPHA)
         pygame.draw.rect(pill, (*PANEL, 235), pill.get_rect(), border_radius=10)
         self.screen.blit(pill, card)
+        pygame.draw.rect(self.screen, OUTLINE, card, 2, border_radius=10)
         self.draw_flag(c, pygame.Rect(card.x + 16, card.y + 14, card.w - 32, 106))
         self.screen.blit(name, name.get_rect(midbottom=(card.centerx, card.bottom - 12)))
 
@@ -1742,11 +1734,17 @@ class App:
         hit = self.country_at(pos, self.cont_view, self.continent_dots)
         return hit if hit and hit.in_quiz and hit.continent == self.continent else None
 
-    def learn_card(self, h):
-        """Rect for the Learn card: top-left on the world, bottom-right (the Atlantic) on the USA map."""
-        if self.scope.card_corner == "bottom-right":
-            return pygame.Rect(WIDTH - 320, MAP_H - 20 - h, 300, h)
-        return pygame.Rect(20, 66, 300, h)
+    def learn_card(self, h, w=300):
+        """Rect for a Learn card of size (w, h) next to the mouse cursor, flipped to stay on the map."""
+        card = pygame.Rect(0, 0, w, h)
+        mx, my = pygame.mouse.get_pos()
+        card.topleft = (mx + 18, my + 18)
+        if card.right > WIDTH - 8:  # flip to the other side of the cursor near the edges
+            card.right = mx - 18
+        if card.bottom > MAP_H - 8:
+            card.bottom = my - 18
+        card.clamp_ip(pygame.Rect(0, 0, WIDTH, MAP_H))
+        return card
 
     def draw_learn_view(self):
         if self.quiz_game():  # USA map between games: nothing to explore
@@ -1765,6 +1763,7 @@ class App:
         pill = pygame.Surface(card.size, pygame.SRCALPHA)
         pygame.draw.rect(pill, (*PANEL, 235), pill.get_rect(), border_radius=10)
         self.screen.blit(pill, card)
+        pygame.draw.rect(self.screen, OUTLINE, card, 2, border_radius=10)
         self.draw_flag(c, pygame.Rect(card.x + 16, card.y + 16, card.w - 32, 170))
         name = self.fit_text(self.name_font, c.name, TEXT, card.w - 24)
         self.screen.blit(name, name.get_rect(midbottom=(card.centerx, card.bottom - 16)))
@@ -1788,6 +1787,7 @@ class App:
         pill = pygame.Surface(card.size, pygame.SRCALPHA)
         pygame.draw.rect(pill, (*PANEL, 235), pill.get_rect(), border_radius=10)
         self.screen.blit(pill, card)
+        pygame.draw.rect(self.screen, OUTLINE, card, 2, border_radius=10)
         self.draw_flag(selected, pygame.Rect(card.x + 16, card.y + 16, card.w - 32, 90))
         lines = [(self.name_font, selected.name, TEXT), (self.small, "Capital", TEXT_DIM),
                  (self.name_font, selected.capital, LAND_HOVER)]
@@ -1927,7 +1927,7 @@ class App:
         answered = q["picked"] is not None
         for i, (rect, c) in enumerate(zip(self.choice_rects(), q["choices"])):
             pygame.draw.rect(self.screen, (66, 72, 86), rect, border_radius=10)
-            pygame.draw.rect(self.screen, (140, 148, 165), rect, 2, border_radius=10)  # outline on every answer
+            pygame.draw.rect(self.screen, OUTLINE, rect, 2, border_radius=10)  # outline on every answer
             # Room for the name underneath is always kept, so nothing moves when the answer is shown.
             if capitals:
                 city = self.fit_text(self.name_font, c.capital, TEXT, rect.w - 24)
