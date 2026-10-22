@@ -48,6 +48,21 @@ pip install -r requirements.txt
 python world_map.py
 ```
 
+## How the code is organised
+
+`world_map.py` starts the game; the code is in the `worldmap` package:
+
+| File | What's in it |
+|---|---|
+| `config.py` | Window size, colours, map views, time limits, file paths, the list of modes |
+| `data.py` | Countries and US states: loading them, accepted names |
+| `geo.py` | Turning longitude/latitude into screen pixels, drawing the map |
+| `storage.py` | Scoreboards and flag/capital progress |
+| `scope.py` | One map you play on (the world or the USA) and its game in progress |
+| `ui.py`, `labels.py`, `scoreboard.py`, `menu.py` | Buttons, cards, the timer, name tags, the Top 10 screens, the Modes menu |
+| `app.py` | The window, main loop, zooming and switching modes |
+| `modes/` | One class per kind of mode: `naming.py` (Countries/States game), `guess.py` (Guess the State/Capital), `quiz.py` (multiple choice), `learn.py` (Learn modes) |
+
 ## Build a Windows .exe
 
 On a Windows PC with Python installed, double-click `build_windows.bat`. It installs what it needs and builds
