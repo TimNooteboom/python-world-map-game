@@ -22,6 +22,10 @@ class TimedMode(Mode):
         """Check the answer box; `submitted` is True when Enter was pressed."""
         raise NotImplementedError
 
+    def accept_suggestion(self):
+        """Tab / → filled in the autocomplete suggestion."""
+        self.check_answer(submitted=False)
+
     # ---------- typing ----------
     def handle_typing(self, event):
         """Typing into the answer box (works on both the world map and continent views)."""
@@ -38,7 +42,7 @@ class TimedMode(Mode):
             elif event.key in (pygame.K_TAB, pygame.K_RIGHT) and matches:
                 app.text = matches[app.suggest_index % len(matches)]
                 app.suggest_index = 0
-                self.check_answer(submitted=False)
+                self.accept_suggestion()
             elif event.key in (pygame.K_DOWN, pygame.K_UP) and matches:
                 app.suggest_index += 1 if event.key == pygame.K_DOWN else -1
         elif event.type == pygame.TEXTINPUT and event.text.isprintable():

@@ -102,6 +102,10 @@ class NamingMode(TimedMode):
                         app.message = f"You already named {c.name}."
                         app.text = ""
                     return
+                if not submitted and self.could_be_longer(guess, c):
+                    # "Niger" could still become "Nigeria": wait for Enter (or more letters).
+                    app.message = f"Press Enter for {c.name}, or keep typing."
+                    return
                 c.found = True
                 app.timer_started = True
                 app.message = f"Correct: {c.name}!" if app.continent else f"Correct: {c.name} ({c.continent})!"
@@ -120,6 +124,16 @@ class NamingMode(TimedMode):
             where = f"in {app.place()}" if app.continent else "on the map"
             app.message = f"'{app.text}' is not a {app.scope.noun} {where}."
             app.text = ""
+
+    def could_be_longer(self, guess, country):
+        """True if guess is also the start of another country you still have to name (niger -> nigeria)."""
+        return any(other is not country and not other.found
+                   and any(name.startswith(guess) and len(name) > len(guess) for name in other.accepted)
+                   for other in self.app.quiz_countries())
+
+    def accept_suggestion(self):
+        # Picking a suggestion with Tab is a clear choice, even "Niger" while Nigeria is still left.
+        self.check_answer(submitted=True)
 
     # ---------- end of game ----------
     def end_message(self, done):

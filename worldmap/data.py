@@ -38,7 +38,7 @@ ALIASES = {
     "Russia": ["russian federation"],
     "Laos": ["lao"],
     "Guinea-Bissau": ["guinea bissau"],
-    "Saint Kitts and Nevis": ["st kitts and nevis"],
+    "Saint Kitts and Nevis": ["st kitts and nevis", "saint kitts"],  # "st kitts" works too: st -> saint
     "Saint Lucia": ["st lucia"],
     "Saint Vincent and the Grenadines": ["st vincent and the grenadines", "st vincent"],
     "Sao Tome and Principe": ["sao tome"],
