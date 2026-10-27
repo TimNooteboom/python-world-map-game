@@ -1,23 +1,21 @@
 """The game window: main loop, maps (world and USA), zooming, switching modes and the shared buttons.
 
-What happens in each mode (clicks, keys, colours, panels) lives in the classes in worldmap/modes.
+What happens in each mode (clicks, keys, colors, panels) lives in the classes in worldmap/modes.
 """
 
 import math
 
 import pygame
 
-from .config import (BORDER, CONTINENT_VIEWS, FPS, HEIGHT, INSET_BOXES, LAND_OTHER, MAP_H, MODES, NE_VIEW, OCEAN,
-                     PANEL, STATE_TIME_LIMIT, TIME_LIMIT, USA_VIEW, WIDTH, WORLD_VIEW, ZOOM_TIME,
-                     CAPITAL_GUESS_SCORES_FILE, GUESS_SCORES_FILE, SCORES_FILE, STATE_SCORES_FILE, starting_scores)
-from .data import State, load_countries, load_state_features
+from .config import (BORDER, FPS, HEIGHT, INSET_BOXES, LAND_OTHER, MAP_H, NE_VIEW, OCEAN, PANEL, USA_VIEW, WIDTH,
+                     WORLD_VIEW, ZOOM_TIME)
 from .geo import View, draw_map
 from .labels import LabelsMixin
 from .menu import MenuMixin
 from .modes import build_modes
-from .scope import Scope, scope_attributes
+from .scope import build_scopes, scope_attributes
 from .scoreboard import ScoreboardMixin
-from .storage import load_progress, save_progress
+from .storage import load_progress
 from .ui import Button, WidgetsMixin
 
 
@@ -37,22 +35,7 @@ class App(WidgetsMixin, LabelsMixin, ScoreboardMixin, MenuMixin):
         self.title_font = pygame.font.SysFont("helveticaneue,arial", 40, bold=True)
         self.name_font = pygame.font.SysFont("helveticaneue,arial", 26, bold=True)
 
-        state_features = load_state_features()
-        self.scopes = {
-            "world": Scope("world", load_countries(), CONTINENT_VIEWS, "country", "countries", TIME_LIMIT,
-                           (SCORES_FILE, starting_scores("scores.json")), "Top 10 Scores"),
-            "usa": Scope("usa", [State(f) for f in state_features], {"USA": USA_VIEW}, "state", "states",
-                         STATE_TIME_LIMIT, (STATE_SCORES_FILE, starting_scores("state_scores.json")),
-                         "Top 10 State Scores"),
-            # Its own copy of the states, so its green/red states and timer don't mix with the States game.
-            "guess": Scope("guess", [State(f) for f in state_features], {"USA": USA_VIEW}, "state", "states",
-                           STATE_TIME_LIMIT, (GUESS_SCORES_FILE, starting_scores("guess_scores.json")),
-                           "Top 10 Guess the State", score_label="Correct"),
-            "guess_capital": Scope("guess_capital", [State(f) for f in state_features], {"USA": USA_VIEW},
-                                   "capital", "capitals", STATE_TIME_LIMIT,
-                                   (CAPITAL_GUESS_SCORES_FILE, starting_scores("capital_guess_scores.json")),
-                                   "Top 10 Guess the Capital", score_label="Correct"),
-        }
+        self.scopes = build_scopes()  # the world and the USA games, each with its own game in progress
         self.scope = self.scopes["world"]
 
         self.world_view = View(WORLD_VIEW)
@@ -60,7 +43,7 @@ class App(WidgetsMixin, LabelsMixin, ScoreboardMixin, MenuMixin):
         self.text = ""  # the answer box
         self.suggest_index = 0  # which autocomplete match is shown (Up/Down to cycle)
         self.message = ""
-        self.anim = None  # (start_time, from_rect, to_rect, zooming_in)
+        self.anim = None  # zoom animation: (start_time, from_rect, to_rect) on the world image
         self.timer_rect = pygame.Rect(WIDTH - 200, 14, 180, 80)
         self.reset_btn = Button("Start over", (WIDTH - 200, 102, 180, 36))  # timed games: resets everything
         self.reset_confirm_until = 0  # resets need a second click within a few seconds
@@ -73,9 +56,8 @@ class App(WidgetsMixin, LabelsMixin, ScoreboardMixin, MenuMixin):
         self.close_btn = Button("View map", (card.centerx + 10, card.bottom - 60, 140, 40))
         self.reset_game_state()
 
-        self.mode = "countries"  # a key of config.MODES
-        self.modes = build_modes(self)
-        self.mode_obj = self.modes[self.mode]
+        self.modes = build_modes(self)  # {key of config.MODES: mode object}
+        self.mode_obj = self.modes["countries"]  # the current mode
         self.menu_open = False
         self.menu_group = None  # menu group expanded to show Learn / Game (a group key in MENU)
         self.modes_btn = Button("Modes", (20, 14, 130, 40))
@@ -88,9 +70,9 @@ class App(WidgetsMixin, LabelsMixin, ScoreboardMixin, MenuMixin):
         self.render_world()
 
     @property
-    def md(self):
-        """The current mode's settings (scope, subject, kind, titles)."""
-        return MODES[self.mode]
+    def mode(self):
+        """The current mode's key in config.MODES."""
+        return self.mode_obj.key
 
     @property
     def quiz(self):
@@ -105,6 +87,7 @@ class App(WidgetsMixin, LabelsMixin, ScoreboardMixin, MenuMixin):
         self.modal = None  # None, "name" (enter your name), "scores" or "leaderboard" (scoreboard)
         self.result = None  # this game's score, once it's over
         self.new_score = None  # the saved entry to highlight on the scoreboard
+        self.save_failed = False  # the score couldn't be written to its file
 
     def quiz_countries(self):
         """Countries that can be named right now: one continent when zoomed in, else all."""
@@ -124,7 +107,7 @@ class App(WidgetsMixin, LabelsMixin, ScoreboardMixin, MenuMixin):
 
     def heading(self):
         """Big heading in the bottom-left panel when zoomed in: the continent, or the mode's title on the USA map."""
-        return self.continent if self.scope.has_world else self.md.title
+        return self.continent if self.scope.has_world else self.mode_obj.info.title
 
     def ne_zoomed(self):
         """Zoomed into the Northeast (Guess the State / Capital)."""
@@ -159,15 +142,15 @@ class App(WidgetsMixin, LabelsMixin, ScoreboardMixin, MenuMixin):
             return
         hover_cont = self.hover.continent if self.hover and self.mode_obj.hover_shows_continent else None
         self.world_surf, self.world_dots = draw_map(self.countries, self.world_view,
-                                                    lambda c: self.mode_obj.world_colour(c, hover_cont))
+                                                    lambda c: self.mode_obj.world_color(c, hover_cont))
 
     def render_continent(self):
-        def colour(c):
+        def color(c):
             if c.continent != self.continent or not c.in_quiz:
                 return LAND_OTHER
-            return self.mode_obj.continent_colour(c)
+            return self.mode_obj.continent_color(c)
 
-        self.continent_surf, self.continent_dots = draw_map(self.countries, self.cont_view, colour)
+        self.continent_surf, self.continent_dots = draw_map(self.countries, self.cont_view, color)
         if not self.scope.has_world:  # frames around the Alaska and Hawaii insets
             for box in INSET_BOXES:
                 pygame.draw.rect(self.continent_surf, BORDER, self.cont_view.screen_rect(box), 1, border_radius=6)
@@ -202,7 +185,7 @@ class App(WidgetsMixin, LabelsMixin, ScoreboardMixin, MenuMixin):
         self.hover = None
         self.mode_obj.reset()
         full = pygame.Rect(0, 0, WIDTH, MAP_H)
-        self.anim = (pygame.time.get_ticks(), full, self.world_view.screen_rect(self.scope.views[continent]), True)
+        self.anim = (pygame.time.get_ticks(), full, self.world_view.screen_rect(self.scope.views[continent]))
         self.mode_obj.on_zoom_in()
 
     def zoom_out(self, message=""):
@@ -214,7 +197,7 @@ class App(WidgetsMixin, LabelsMixin, ScoreboardMixin, MenuMixin):
             self.render_continent()
             return
         full = pygame.Rect(0, 0, WIDTH, MAP_H)
-        self.anim = (pygame.time.get_ticks(), self.world_view.screen_rect(self.scope.views[self.continent]), full, False)
+        self.anim = (pygame.time.get_ticks(), self.world_view.screen_rect(self.scope.views[self.continent]), full)
         self.continent = None
         self.show_missed = False
         self.hover = None
@@ -225,7 +208,7 @@ class App(WidgetsMixin, LabelsMixin, ScoreboardMixin, MenuMixin):
         self.render_world()
 
     def draw_animation(self):
-        start, r0, r1, zooming_in = self.anim
+        start, r0, r1 = self.anim
         t = min(1.0, (pygame.time.get_ticks() - start) / 1000 / ZOOM_TIME)
         t = t * t * (3 - 2 * t)  # ease in/out
         # Interpolate the part of the world image that fills the screen.
@@ -257,9 +240,8 @@ class App(WidgetsMixin, LabelsMixin, ScoreboardMixin, MenuMixin):
         self.menu_open = False
         if mode == self.mode:
             return
-        self.mode = mode
         self.mode_obj = self.modes[mode]
-        self.scope = self.scopes[self.md.scope]
+        self.scope = self.scopes[self.mode_obj.info.scope]
         self.mode_obj.reset()
         self.hover = None
         self.text = ""
@@ -318,9 +300,7 @@ class App(WidgetsMixin, LabelsMixin, ScoreboardMixin, MenuMixin):
             # Needs a second click to confirm, like "Start over". Only resets this game's continents.
             if pygame.time.get_ticks() < self.reset_confirm_until:
                 self.reset_confirm_until = 0
-                self.perfect[self.mode_obj.progress_key()].clear()
-                save_progress(self.perfect)
-                self.rerender()
+                self.mode_obj.reset_progress()
             else:
                 self.reset_confirm_until = pygame.time.get_ticks() + 3000
             return True

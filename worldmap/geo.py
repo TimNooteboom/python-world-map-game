@@ -4,7 +4,7 @@ import math
 
 import pygame
 
-from .config import BORDER, LAND_HOVER, MAP_H, OCEAN, WIDTH
+from .config import BORDER, MAP_H, OCEAN, WIDTH
 
 
 class View:
@@ -22,7 +22,7 @@ class View:
 
     def project_ring(self, ring):
         # Shift whole rings that sit west of 0° so islands just past the date line
-        # appear next to their Pacific neighbours (only in views that cross 180°).
+        # appear next to their Pacific neighbors (only in views that cross 180°).
         shift = 360 if self.wrap and all(lon <= 0 for lon, _ in ring) else 0
         return [self.to_screen(lon + shift, lat) for lon, lat in ring]
 
@@ -40,22 +40,20 @@ class View:
         return pygame.Rect(x0, y0, x1 - x0, y1 - y0)
 
 
-def draw_map(countries, view, colour_for, highlight=None):
+def draw_map(countries, view, color_for):
     """Draw the map; returns the surface and the [(x, y, country)] dots drawn for tiny countries."""
     surf = pygame.Surface((WIDTH, MAP_H))
     surf.fill(OCEAN)
     small = []
     for c in countries:
-        colour = colour_for(c)
-        if c is highlight:
-            colour = LAND_HOVER
+        color = color_for(c)
         rings = [view.project_ring(ring) for ring in c.rings]
         for pts in rings:
             xs = [p[0] for p in pts]
             if max(xs) < 0 or min(xs) > WIDTH:
                 continue
             if len(pts) >= 3:
-                pygame.draw.polygon(surf, colour, pts)
+                pygame.draw.polygon(surf, color, pts)
                 pygame.draw.polygon(surf, BORDER, pts, 1)
         # Mark microstates / tiny islands with a dot so they are visible and clickable.
         # Spread-out island nations (e.g. Kiribati) get a dot on their biggest island.
@@ -71,11 +69,11 @@ def draw_map(countries, view, colour_for, highlight=None):
         all_pts = [p for pts in rings for p in pts]
         w, h, cx, cy = extent(all_pts)
         if w < 6 and h < 6:
-            small.append((cx, cy, colour, c))
+            small.append((cx, cy, color, c))
         elif all(sw < 4 and sh < 4 for sw, sh, _, _ in sizes):
             _, _, cx, cy = max(sizes, key=lambda e: e[0] * e[1])
-            small.append((cx, cy, colour, c))
-    for x, y, colour, _ in small:
-        pygame.draw.circle(surf, colour, (x, y), 5)
+            small.append((cx, cy, color, c))
+    for x, y, color, _ in small:
+        pygame.draw.circle(surf, color, (x, y), 5)
         pygame.draw.circle(surf, BORDER, (x, y), 5, 1)
     return surf, [(x, y, c) for x, y, _, c in small]

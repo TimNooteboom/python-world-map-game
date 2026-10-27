@@ -7,13 +7,15 @@ build/
 dist/
 *.spec
 
-# Your own saved scores and progress (each player keeps their own; starting_scores/ is what new players get)
+# Your own saved scores and progress (each player keeps their own)
 /scores.json
 /state_scores.json
 /guess_scores.json
 /capital_guess_scores.json
 /flag_progress.json
 
+# Starting scoreboards bundled into the .exe / app you build; kept on your computer, not on GitHub
+starting_scores/
+
 # macOS
 .DS_Store
-starting_scores/

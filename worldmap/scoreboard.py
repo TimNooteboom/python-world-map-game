@@ -5,7 +5,7 @@ import time
 import pygame
 
 from .config import FOUND, HEIGHT, PANEL, TEXT, TEXT_DIM, WIDTH
-from .storage import load_scores, rank_key, save_scores, score_count
+from .storage import load_scores, save_scores, score_count
 from .ui import fmt_date, fmt_time
 
 
@@ -48,10 +48,9 @@ class ScoreboardMixin:
             scores, _ = load_scores(*self.scope.score_files)
             self.new_score = dict(self.result, name=self.name_text.strip(),
                                   date=time.strftime("%Y-%m-%d"))
-            scores.append(self.new_score)
             # Only the top 10 are kept; a score that doesn't make it is still shown as "didn't make the top 10".
-            top = sorted(scores, key=rank_key)[:10]
-            save_scores(self.scope.score_files[0], top, self.name_text.strip())
+            self.save_failed = not save_scores(self.scope.score_files[0], scores + [self.new_score],
+                                               self.name_text.strip())
         self.modal = "scores"
 
     def draw_card(self, height):
@@ -72,8 +71,8 @@ class ScoreboardMixin:
             (self.small, "Enter your first name for the scoreboard:", TEXT_DIM),
         ]
         y = card.y + 28
-        for font, text, colour in lines:
-            img = font.render(text, True, colour)
+        for font, text, color in lines:
+            img = font.render(text, True, color)
             self.screen.blit(img, img.get_rect(midtop=(cx, y)))
             y += img.get_height() + 14
         box = pygame.Rect(cx - 150, card.y + 185, 300, 44)
@@ -86,8 +85,7 @@ class ScoreboardMixin:
 
     def draw_scoreboard(self):
         card = self.draw_card(self.card.h)
-        scores, _ = load_scores(*self.scope.score_files)
-        top = sorted(scores, key=rank_key)[:10]
+        top, _ = load_scores(*self.scope.score_files)
         title = self.big.render(self.scope.board_title, True, TEXT)
         self.screen.blit(title, title.get_rect(midtop=(card.centerx, card.y + 22)))
 
@@ -110,8 +108,12 @@ class ScoreboardMixin:
                 self.screen.blit(img, (x, y), pygame.Rect(0, 0, 200, 30))
             y += 36
         if self.new_score and self.new_score not in top:
-            note = self.small.render(f"Your score ({score_count(self.new_score)} in "
-                                     f"{fmt_time(self.new_score['seconds'])}) didn't make the top 10.", True, TEXT_DIM)
+            score = f"{score_count(self.new_score)} in {fmt_time(self.new_score['seconds'])}"
+            if self.save_failed:
+                text = f"Your score ({score}) couldn't be saved: the game can't write to its folder."
+            else:
+                text = f"Your score ({score}) didn't make the top 10."
+            note = self.small.render(text, True, TEXT_DIM)
             self.screen.blit(note, note.get_rect(midtop=(card.centerx, card.bottom - 92)))
         if self.modal == "leaderboard":  # opened from the Leaderboard button mid-game
             self.lb_close_btn.draw(self.screen, self.font)

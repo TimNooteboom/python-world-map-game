@@ -1,4 +1,4 @@
-"""Settings: window size, colours, map views, time limits, file locations and the list of modes."""
+"""Settings: window size, colors, map views, time limits, file locations and the list of modes."""
 
 import os
 import sys
@@ -9,7 +9,12 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def save_dir():
-    """Where scores and progress are saved: next to the script, or a per-user folder in the packaged app."""
+    """Where scores and progress are saved: next to the script, or a per-user folder in the packaged app.
+
+    The WORLD_MAP_SAVE_DIR environment variable overrides it (the tests use a temporary folder).
+    """
+    if os.environ.get("WORLD_MAP_SAVE_DIR"):
+        return os.environ["WORLD_MAP_SAVE_DIR"]
     if not getattr(sys, "frozen", False):
         return HERE
     if sys.platform == "darwin":
@@ -53,7 +58,7 @@ TIME_LIMIT = 15 * 60  # seconds; the clock starts with the first correct answer
 STATE_TIME_LIMIT = 5 * 60  # the same for the States game
 WARNING_TIME = 30  # seconds left when the clock and its bar turn red
 
-# Colours
+# Colors
 OCEAN = (170, 205, 230)
 LAND = (236, 228, 205)
 LAND_HOVER = (250, 214, 140)
@@ -93,6 +98,7 @@ NE_SMALL = {"Rhode Island", "Delaware", "Connecticut", "New Jersey", "Massachuse
 # Top-to-bottom order of their tags in the column off the coast (States game and guess games).
 NE_CALLOUT_ORDER = ["Vermont", "New Hampshire", "Massachusetts", "Rhode Island", "Connecticut", "New Jersey",
                     "Delaware", "Maryland"]
+NE_CALLOUT_X, NE_CALLOUT_TOP, NE_CALLOUT_STEP = 1060, 205, 30  # where that column is on screen
 
 # Finishing a continent in the country game moves you on to the next unfinished one, in this order.
 CONTINENT_ORDER = ["North America", "South America", "Europe", "Africa", "Asia", "Oceania"]

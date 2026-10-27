@@ -4,7 +4,7 @@ import random
 
 import pygame
 
-from ..config import (FOUND, LAND_HOVER, MAP_H, MISSED, OUTLINE, PANEL, TEXT, TEXT_DIM, WIDTH)
+from ..config import FOUND, LAND_HOVER, MAP_H, MISSED, OUTLINE, PANEL, TEXT, TEXT_DIM, WIDTH
 from ..storage import save_progress
 from ..ui import Button
 from .base import Mode
@@ -259,8 +259,8 @@ class FactMode(Mode):
                   TEXT_DIM)]
         self.done_globe_btn.text = "Back to globe" if world else "Close"
         y = card.y + 30
-        for font, text, colour in lines:
-            img = font.render(text, True, colour)
+        for font, text, color in lines:
+            img = font.render(text, True, color)
             app.screen.blit(img, img.get_rect(midtop=(card.centerx, y)))
             y += img.get_height() + 14
         self.replay_btn.draw(app.screen, app.font)
@@ -295,21 +295,27 @@ class QuizGameMode(FactMode):
             perfect.add(app.continent)
             save_progress(app.perfect)
 
+    def reset_progress(self):
+        """The Reset button (after its confirm click): this game's continents aren't green any more."""
+        self.perfect().clear()
+        save_progress(self.app.perfect)
+        self.app.rerender()
+
     def show_reset(self):
         """The Reset button: on the globe, or the USA map when no game is running."""
         app = self.app
         return app.continent is None or (not app.scope.has_world and not self.quiz)
 
     # ---------- map ----------
-    def world_colour(self, c, hover_continent):
+    def world_color(self, c, hover_continent):
         if c.in_quiz and c.continent in self.perfect():
             return FOUND
-        return super().world_colour(c, hover_continent)
+        return super().world_color(c, hover_continent)
 
-    def continent_colour(self, c):
+    def continent_color(self, c):
         if self.app.continent in self.perfect():
             return FOUND
-        return super().continent_colour(c)
+        return super().continent_color(c)
 
     # ---------- USA map between games ----------
     def handle_explore_event(self, event):

@@ -5,7 +5,7 @@ import math
 import pygame
 
 from ..data import fold
-from ..storage import load_scores, rank_key
+from ..storage import load_scores, makes_top_10
 from .base import Mode
 
 
@@ -61,7 +61,7 @@ class TimedMode(Mode):
             return []
         matches = set()
         for c in self.app.quiz_countries():
-            if c.found or getattr(c, "missed", False):
+            if c.found or c.missed:
                 continue
             name = self.answer_name(c)
             for name in (name, name[4:] if name.startswith("The ") else None):
@@ -109,8 +109,7 @@ class TimedMode(Mode):
         self.on_game_over()
         app.message = self.end_message(done)
         scores, last_name = load_scores(*app.scope.score_files)
-        top = sorted(scores, key=rank_key)[:10]
-        if len(top) < 10 or rank_key(app.result) < rank_key(top[-1]):
+        if makes_top_10(app.result, scores):
             app.name_text = last_name
             app.modal = "name"  # made the top 10: ask for a name
         else:

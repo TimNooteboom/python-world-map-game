@@ -1,5 +1,9 @@
 """A scope is one map you can play on (the world, or the USA) with its own game in progress."""
 
+from .config import (CAPITAL_GUESS_SCORES_FILE, CONTINENT_VIEWS, GUESS_SCORES_FILE, SCORES_FILE, STATE_SCORES_FILE,
+                     STATE_TIME_LIMIT, TIME_LIMIT, USA_VIEW, starting_scores)
+from .data import State, load_countries, load_state_features
+
 
 class Scope:
     """One map you can play on (the world or the USA): its countries/states, game in progress and scores."""
@@ -26,6 +30,28 @@ class Scope:
         self.show_missed = False  # names of missed countries shown on the map after "Give up"
         self.auto_zoom_out_at = None  # time to move on after finishing a continent
         self.guess_order, self.guess_index = [], 0  # Guess the State: states in the order they're asked
+
+
+def build_scopes():
+    """{key: Scope} for the world and the USA games (each USA game keeps its own states and timer)."""
+    state_features = load_state_features()
+
+    def states():
+        return [State(f) for f in state_features]
+
+    return {
+        "world": Scope("world", load_countries(), CONTINENT_VIEWS, "country", "countries", TIME_LIMIT,
+                       (SCORES_FILE, starting_scores("scores.json")), "Top 10 Scores"),
+        "usa": Scope("usa", states(), {"USA": USA_VIEW}, "state", "states", STATE_TIME_LIMIT,
+                     (STATE_SCORES_FILE, starting_scores("state_scores.json")), "Top 10 State Scores"),
+        "guess": Scope("guess", states(), {"USA": USA_VIEW}, "state", "states", STATE_TIME_LIMIT,
+                       (GUESS_SCORES_FILE, starting_scores("guess_scores.json")), "Top 10 Guess the State",
+                       score_label="Correct"),
+        "guess_capital": Scope("guess_capital", states(), {"USA": USA_VIEW}, "capital", "capitals",
+                               STATE_TIME_LIMIT,
+                               (CAPITAL_GUESS_SCORES_FILE, starting_scores("capital_guess_scores.json")),
+                               "Top 10 Guess the Capital", score_label="Correct"),
+    }
 
 
 # App attributes that belong to the current Scope (see App.scope); App reads and writes them there.

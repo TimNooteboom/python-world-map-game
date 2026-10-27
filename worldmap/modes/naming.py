@@ -3,7 +3,7 @@
 import pygame
 
 from ..config import CONTINENT_ORDER, FOUND, LAND, MAP_H, MISSED, TEXT, TEXT_DIM, WIDTH
-from ..data import normalise
+from ..data import normalize
 from ..storage import score_count
 from ..ui import Button, fmt_time
 from .timed import TimedMode
@@ -39,12 +39,12 @@ class NamingMode(TimedMode):
         app.zoom_out(app.message)  # every continent is done
 
     # ---------- map ----------
-    def world_colour(self, c, hover_continent):
+    def world_color(self, c, hover_continent):
         if c.found:
             return FOUND
-        return super().world_colour(c, hover_continent)
+        return super().world_color(c, hover_continent)
 
-    def continent_colour(self, c):
+    def continent_color(self, c):
         if c.found:
             return FOUND
         if self.app.continent in self.app.gave_up:
@@ -92,7 +92,7 @@ class NamingMode(TimedMode):
 
     def check_answer(self, submitted):
         app = self.app
-        guess = normalise(app.text)
+        guess = normalize(app.text)
         if not guess:
             return
         for c in app.quiz_countries():

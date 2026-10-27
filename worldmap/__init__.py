@@ -1,7 +1,7 @@
 """World Map Game: a geography quiz in pygame.
 
 Modules:
-    config      sizes, colours, map views, time limits, file paths, the list of modes
+    config      sizes, colors, map views, time limits, file paths, the list of modes
     data        countries and US states (loading, names, point-in-shape tests)
     geo         turning lon/lat into screen pixels, drawing the map
     storage     scoreboards and flag/capital progress

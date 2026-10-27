@@ -34,8 +34,8 @@ class Button:
 class WidgetsMixin:
     """Drawing helpers used by every mode (part of App; uses its screen, fonts and current scope)."""
 
-    def fit_text(self, font, text, colour, max_w):
-        img = font.render(text, True, colour)
+    def fit_text(self, font, text, color, max_w):
+        img = font.render(text, True, color)
         if img.get_width() > max_w:
             img = pygame.transform.smoothscale_by(img, max_w / img.get_width())
         return img
@@ -51,7 +51,7 @@ class WidgetsMixin:
                 img = pygame.transform.smoothscale(img, (round(img.get_width() * scale),
                                                          round(img.get_height() * scale)))
             except (OSError, pygame.error):
-                img = pygame.Surface((size[0], size[1] * 2 // 3))  # missing file: grey box with "?"
+                img = pygame.Surface((size[0], size[1] * 2 // 3))  # missing file: gray box with "?"
                 img.fill((120, 125, 135))
                 q = self.big.render("?", True, TEXT)
                 img.blit(q, q.get_rect(center=img.get_rect().center))
@@ -59,7 +59,7 @@ class WidgetsMixin:
         return self.flag_cache[key]
 
     def draw_flag(self, country, box):
-        """Flag centred in a pygame.Rect, with a thin border."""
+        """Flag centered in a pygame.Rect, with a thin border."""
         img = self.flag_image(country, (box.w, box.h))
         rect = img.get_rect(center=box.center)
         self.screen.blit(img, rect)
@@ -85,22 +85,22 @@ class WidgetsMixin:
         self.screen.blit(pill, card)
         pygame.draw.rect(self.screen, OUTLINE, card, 2, border_radius=10)
 
-    def draw_country_highlight(self, country, colour, view=None, dots=None):
+    def draw_country_highlight(self, country, color, view=None, dots=None):
         """Paint one country (and its dot, if it is tiny) on top of the map (the continent map by default)."""
         view = view or self.cont_view
         for ring in country.rings:
             pts = view.project_ring(ring)
             if len(pts) >= 3:
-                pygame.draw.polygon(self.screen, colour, pts)
+                pygame.draw.polygon(self.screen, color, pts)
                 pygame.draw.polygon(self.screen, BORDER, pts, 1)
         for x, y, c in self.continent_dots if dots is None else dots:
             if c is country:
-                pygame.draw.circle(self.screen, colour, (x, y), 7)
+                pygame.draw.circle(self.screen, color, (x, y), 7)
                 pygame.draw.circle(self.screen, BORDER, (x, y), 7, 1)
 
     # ---------- title, answer box, timer ----------
     def draw_title(self):
-        title = self.title_font.render(self.md.title, True, TEXT)
+        title = self.title_font.render(self.mode_obj.info.title, True, TEXT)
         rect = title.get_rect(midtop=(WIDTH // 2, 14)).inflate(32, 12)
         pill = pygame.Surface(rect.size, pygame.SRCALPHA)
         pygame.draw.rect(pill, (*PANEL, 215), pill.get_rect(), border_radius=10)
@@ -129,7 +129,7 @@ class WidgetsMixin:
             x = inner.x + typed.get_width()
             matches = self.mode_obj.suggestions()
             if matches:
-                # Grey "ghost" text completing the name; Tab accepts it.
+                # Gray "ghost" text completing the name; Tab accepts it.
                 rest = matches[self.suggest_index % len(matches)][len(self.text):]
                 more = f"  ({self.suggest_index % len(matches) + 1}/{len(matches)})" if len(matches) > 1 else ""
                 ghost = self.font.render(rest + more, True, (165, 165, 165))
@@ -146,8 +146,8 @@ class WidgetsMixin:
         self.screen.blit(overlay, self.timer_rect)
         # Counts up from 0:00 to the time limit, which is shown next to it.
         elapsed = self.scope.time_limit - self.time_left
-        colour = MISSED if self.time_left <= WARNING_TIME else TEXT
-        clock = self.big.render(fmt_time(elapsed), True, colour)
+        color = MISSED if self.time_left <= WARNING_TIME else TEXT
+        clock = self.big.render(fmt_time(elapsed), True, color)
         limit = self.font.render(f" / {fmt_time(self.scope.time_limit)}", True, TEXT_DIM)
         row = pygame.Rect(0, 0, clock.get_width() + limit.get_width(), clock.get_height())
         row.midbottom = (self.timer_rect.centerx, self.timer_rect.bottom - 14)
@@ -156,7 +156,7 @@ class WidgetsMixin:
         # Progress bar towards the time limit.
         bar = pygame.Rect(self.timer_rect.x + 12, self.timer_rect.bottom - 10, self.timer_rect.w - 24, 4)
         pygame.draw.rect(self.screen, (80, 86, 98), bar, border_radius=2)
-        pygame.draw.rect(self.screen, colour if self.time_left <= WARNING_TIME else FOUND,
+        pygame.draw.rect(self.screen, color if self.time_left <= WARNING_TIME else FOUND,
                          (bar.x, bar.y, bar.w * elapsed / self.scope.time_limit, bar.h), border_radius=2)
         status = (self.over_label().rstrip("!").upper() if self.time_up else "PAUSED" if self.timer_paused()
                   else f"TIME ({self.scope.time_limit // 60} MIN MAX)" if self.timer_started else "STARTS ON 1ST ANSWER")

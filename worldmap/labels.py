@@ -4,16 +4,17 @@ import math
 
 import pygame
 
-from .config import FOUND_LABEL, MAP_H, MISSED, NE_CALLOUT_ORDER, PANEL, TEXT, WIDTH
+from .config import (FOUND_LABEL, MAP_H, MISSED, NE_CALLOUT_ORDER, NE_CALLOUT_STEP, NE_CALLOUT_TOP,
+                     NE_CALLOUT_X, PANEL, TEXT, WIDTH)
 
 
 class LabelsMixin:
     """Part of App: lays out and draws the name tags for the current map."""
 
     def draw_labels(self):
-        """Name tags on the map: green for countries you've named, dark for missed ones after "Give up"."""
+        """Name tags on the map: black on countries you've named, red on missed ones, dark after "Give up"."""
         key = (self.continent, self.cont_view.box if self.cont_view else None, self.show_missed,
-               tuple((c.found, getattr(c, "missed", False)) for c in self.countries))
+               tuple((c.found, c.missed) for c in self.countries))
         if self.label_cache[0] != key:
             self.label_cache = (key, self.place_labels())
         placed = self.label_cache[1]
@@ -38,20 +39,20 @@ class LabelsMixin:
         zoomed = self.continent is not None
         view = self.cont_view if zoomed else self.world_view
         shown = [c for c in self.quiz_countries()
-                 if c.found or getattr(c, "missed", False) or (zoomed and self.show_missed)]
+                 if c.found or c.missed or (zoomed and self.show_missed)]
         # Place the smallest countries first, so they get the spots closest to them.
         shown.sort(key=lambda c: (c.bbox[2] - c.bbox[0]) * (c.bbox[3] - c.bbox[1]))
         bounds = pygame.Rect(4, 4, WIDTH - 8, MAP_H - 8)
         placed = []
         # States game / guess games: the small northeastern states get their tag out in the Atlantic, joined by
-        # a line, so the tags don't cover their neighbours. Placed first, so other tags keep clear of them.
+        # a line, so the tags don't cover their neighbors. Placed first, so other tags keep clear of them.
         callouts = self.ne_callout_slots()
         shown.sort(key=lambda c: c.name not in callouts)
         for c in shown:
             ax, ay = view.project_ring([c.label_pt])[0]
             text = self.label_font.render(self.mode_obj.label_text(c), True, TEXT)
             rect = text.get_rect().inflate(10, 4)
-            bg = FOUND_LABEL if c.found else MISSED if getattr(c, "missed", False) else PANEL
+            bg = FOUND_LABEL if c.found else MISSED if c.missed else PANEL
             if c.name in callouts:
                 rect.midleft = callouts[c.name]
                 placed.append((rect, text, (ax, ay), bg))
@@ -77,7 +78,7 @@ class LabelsMixin:
         """
         if not self.mode_obj.ne_callouts() or self.ne_zoomed():
             return {}
-        return {name: (1060, 205 + i * 30) for i, name in enumerate(NE_CALLOUT_ORDER)}
+        return {name: (NE_CALLOUT_X, NE_CALLOUT_TOP + i * NE_CALLOUT_STEP) for i, name in enumerate(NE_CALLOUT_ORDER)}
 
     @staticmethod
     def label_offsets():

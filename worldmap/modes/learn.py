@@ -64,7 +64,7 @@ class CountryLearnMode(Mode):
     def draw_panel(self):
         app = self.app
         if app.continent is None:
-            app.screen.blit(app.big.render("Countries: Learn", True, TEXT), (24, MAP_H + 14))
+            app.screen.blit(app.big.render(self.info.label, True, TEXT), (24, MAP_H + 14))
             hint = "Hover over a country to see its name and flag. Click a continent to zoom in."
         else:
             app.screen.blit(app.big.render(app.heading(), True, TEXT), (24, MAP_H + 14))
@@ -102,9 +102,7 @@ class FactLearnMode(FactMode):
 
     def draw_explore(self):
         app = self.app
-        if app.hover and app.hover is not self.selected:
-            app.draw_country_highlight(app.hover, LAND_HOVER)
-        c = self.selected
+        c = self.selected  # the country under the mouse
         if c:
             app.draw_country_highlight(c, SELECTED)
         if self.subject == "capitals":
@@ -140,8 +138,8 @@ class FactLearnMode(FactMode):
         lines = [(app.name_font, selected.name, TEXT), (app.small, "Capital", TEXT_DIM),
                  (app.name_font, selected.capital, LAND_HOVER)]
         y = card.y + 120
-        for font, text, colour in lines:
-            img = app.fit_text(font, text, colour, card.w - 24)
+        for font, text, color in lines:
+            img = app.fit_text(font, text, color, card.w - 24)
             app.screen.blit(img, img.get_rect(midtop=(card.centerx, y)))
             y += img.get_height() + 8
 

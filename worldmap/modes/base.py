@@ -1,4 +1,4 @@
-"""The base class every mode builds on. A mode decides how the map is coloured, what clicks and keys do,
+"""The base class every mode builds on. A mode decides how the map is colored, what clicks and keys do,
 and what is drawn on top of the map and in the bottom panel."""
 
 import pygame
@@ -35,12 +35,12 @@ class Mode:
     def update(self):
         """Called every frame before drawing."""
 
-    # ---------- map colours ----------
-    def world_colour(self, c, hover_continent):
+    # ---------- map colors ----------
+    def world_color(self, c, hover_continent):
         return LAND_HOVER if c.continent == hover_continent else LAND
 
-    def continent_colour(self, c):
-        """Colour of a country in the zoomed-in continent (other continents are always grey)."""
+    def continent_color(self, c):
+        """Color of a country in the zoomed-in continent (other continents are always gray)."""
         return LAND
 
     # ---------- input ----------
@@ -78,3 +78,6 @@ class Mode:
     def show_reset(self):
         """True if the top-right Reset button (flag and capital games) is showing."""
         return False
+
+    def reset_progress(self):
+        """What the Reset button does (only called when show_reset() is True)."""

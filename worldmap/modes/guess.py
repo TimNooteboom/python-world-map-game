@@ -6,7 +6,7 @@ import pygame
 
 from ..config import (FOUND, LAND, MAP_H, MISSED, NE_SMALL, NE_VIEW, PANEL, SELECTED, TEXT, TEXT_DIM, USA_VIEW,
                       WIDTH)
-from ..data import normalise
+from ..data import normalize
 from ..geo import View
 from ..storage import score_count
 from ..ui import Button, fmt_time
@@ -28,7 +28,7 @@ class GuessMode(TimedMode):
     answer_name = answer_of  # for autocomplete
 
     def answers(self, c):
-        return {normalise(c.capital)} if self.capital else c.accepted
+        return {normalize(c.capital)} if self.capital else c.accepted
 
     def label_text(self, c):
         return c.capital if self.capital else c.short_name  # Guess the Capital labels states with their capital
@@ -62,14 +62,14 @@ class GuessMode(TimedMode):
             return app.guess_order[app.guess_index]
         return None
 
-    def continent_colour(self, c):
+    def continent_color(self, c):
         return FOUND if c.found else MISSED if c.missed else SELECTED if c is self.target() else LAND
 
     def check_answer(self, submitted):
         """Typing turns the state green as soon as it's right; Enter with another state's name (or capital) is a miss."""
         app = self.app
         target = self.target()
-        guess = normalise(app.text)
+        guess = normalize(app.text)
         if not guess or target is None:
             return
         if guess in self.answers(target):
@@ -167,11 +167,12 @@ class GuessMode(TimedMode):
 
     def end_message(self, done):
         start = "Time's up" if self.app.time_left <= 0 else "Done"
-        return f"{start}! {done} / 50 correct."
+        return f"{start}! {done} / {self.app.total_countries()} correct."
 
     def result_text(self, result):
-        title = "Time's up!" if self.app.time_left <= 0 else "All 50 answered!"
-        return title, f"{score_count(result)} / 50 correct in {fmt_time(result['seconds'])}"
+        total = self.app.total_countries()
+        title = "Time's up!" if self.app.time_left <= 0 else f"All {total} answered!"
+        return title, f"{score_count(result)} / {total} correct in {fmt_time(result['seconds'])}"
 
     # ---------- drawing ----------
     def draw_zoomed(self):
@@ -183,7 +184,7 @@ class GuessMode(TimedMode):
         right = sum(c.found for c in app.countries)
         wrong = sum(c.missed for c in app.countries)
         app.screen.blit(app.big.render(self.info.title, True, TEXT), (24, MAP_H + 14))
-        info = f"{right} correct  ·  {wrong} missed  ·  {50 - right - wrong} left"
+        info = f"{right} correct  ·  {wrong} missed  ·  {app.total_countries() - right - wrong} left"
         app.screen.blit(app.font.render(info, True, TEXT_DIM), (24, MAP_H + 60))
         app.draw_text_box(pygame.Rect(390, MAP_H + 20, 500, 40), app.message,
                           locked=app.over_label() if app.time_up else None)

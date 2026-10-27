@@ -48,13 +48,13 @@ pip install -r requirements.txt
 python world_map.py
 ```
 
-## How the code is organised
+## How the code is organized
 
 `world_map.py` starts the game; the code is in the `worldmap` package:
 
 | File | What's in it |
 |---|---|
-| `config.py` | Window size, colours, map views, time limits, file paths, the list of modes |
+| `config.py` | Window size, colors, map views, time limits, file paths, the list of modes |
 | `data.py` | Countries and US states: loading them, accepted names |
 | `geo.py` | Turning longitude/latitude into screen pixels, drawing the map |
 | `storage.py` | Scoreboards and flag/capital progress |
@@ -62,6 +62,15 @@ python world_map.py
 | `ui.py`, `labels.py`, `scoreboard.py`, `menu.py` | Buttons, cards, the timer, name tags, the Top 10 screens, the Modes menu |
 | `app.py` | The window, main loop, zooming and switching modes |
 | `modes/` | One class per kind of mode: `naming.py` (Countries/States game), `guess.py` (Guess the State/Capital), `quiz.py` (multiple choice), `learn.py` (Learn modes) |
+
+## Tests
+
+```
+python -m unittest discover tests
+```
+
+The tests play through every mode without opening a window and check things like scoring, name spelling and
+save files. They save to a temporary folder, so your own scores are never touched.
 
 ## Build a Windows .exe
 
