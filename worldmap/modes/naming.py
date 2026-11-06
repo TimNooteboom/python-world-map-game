@@ -2,7 +2,7 @@
 
 import pygame
 
-from ..config import CONTINENT_ORDER, FOUND, LAND, MAP_H, MISSED, TEXT, TEXT_DIM, WIDTH
+from ..config import CONTINENT_ORDER, FOUND, LAND, LAND_HOVER, MAP_H, MISSED, TEXT, TEXT_DIM, WIDTH
 from ..data import normalize
 from ..storage import score_count
 from ..ui import Button, fmt_time
@@ -14,6 +14,9 @@ class NamingMode(TimedMode):
         super().__init__(app, key)
         self.back_btn = Button("Back", (WIDTH - 260, MAP_H + 20, 100, 36))
         self.giveup_btn = Button("Give up", (WIDTH - 150, MAP_H + 20, 130, 36))
+        # A counted answer left in the box because a longer name starts with it ("Niger" -> "Nigeria").
+        self.kept_text = self.kept_country = None
+        self.hint = None  # unnamed country you clicked: its first letter is shown as a hint
 
     # ---------- switching / per frame ----------
     def enter(self):
@@ -42,12 +45,14 @@ class NamingMode(TimedMode):
     def world_color(self, c, hover_continent):
         if c.found:
             return FOUND
+        if c.missed:  # not named before the time ran out
+            return MISSED
         return super().world_color(c, hover_continent)
 
     def continent_color(self, c):
         if c.found:
             return FOUND
-        if self.app.continent in self.app.gave_up:
+        if c.missed or self.app.continent in self.app.gave_up:
             return MISSED
         return LAND
 
@@ -64,6 +69,23 @@ class NamingMode(TimedMode):
             super().handle_world_event(event)
         else:
             self.handle_typing(event)
+
+    def click_for_hint(self, pos):
+        """Zoomed in: clicking an unnamed country shows its first letter (once the game has started).
+        Clicking it again, or anywhere else, hides the hint."""
+        app = self.app
+        if not app.timer_started:
+            app.message = f"Hints start once you've named your first {app.scope.noun}."
+            return
+        hit = app.country_at(pos, app.cont_view, app.continent_dots)
+        if hit and hit.in_quiz and not hit.found and hit.continent == app.continent and hit is not self.hint:
+            self.hint = hit
+        else:
+            self.hint = None
+
+    def reset(self):
+        super().reset()
+        self.hint = None
 
     def handle_event(self, event):
         app = self.app
@@ -87,29 +109,41 @@ class NamingMode(TimedMode):
                 else:
                     app.message = f"{missed} {app.scope.nouns} still missing (in red)."
                 app.render_continent()
+            elif not app.time_up and not app.show_missed:
+                self.click_for_hint(event.pos)
         elif not app.show_missed:  # no typing while the answers are on screen
             self.handle_typing(event)
 
     def check_answer(self, submitted):
         app = self.app
         guess = normalize(app.text)
+        if self.kept_text is not None and not app.text.startswith(self.kept_text):
+            self.kept_text = self.kept_country = None  # the kept answer was left behind: it stays counted
         if not guess:
             return
         for c in app.quiz_countries():
             if guess in c.accepted:
                 if c.found:
-                    if submitted:
+                    if c is self.kept_country:
+                        # Still typing the rest of a counted name ("Marshall Is" -> "Marshall Islands"): clear
+                        # the box once it's complete (or on Enter).
+                        if submitted or not self.could_be_longer(guess, c):
+                            self.kept_text = self.kept_country = None
+                            app.text = ""
+                    elif submitted:
                         app.message = f"You already named {c.name}."
                         app.text = ""
                     return
-                if not submitted and self.could_be_longer(guess, c):
-                    # "Niger" could still become "Nigeria": wait for Enter (or more letters).
-                    app.message = f"Press Enter for {c.name}, or keep typing."
-                    return
+                # A name counts as soon as it matches ("Niger", "Marshall Is"), but stays in the box while a longer
+                # name could still be coming ("Nigeria", "Marshall Islands").
+                keep = not submitted and self.could_be_longer(guess, c)
+                if self.kept_country is not None:
+                    self.kept_country.found = False  # you were typing the longer name, not "Niger"
                 c.found = True
                 app.timer_started = True
                 app.message = f"Correct: {c.name}!" if app.continent else f"Correct: {c.name} ({c.continent})!"
-                app.text = ""
+                app.text = app.text if keep else ""
+                self.kept_text, self.kept_country = (app.text, c) if keep else (None, None)
                 app.rerender()
                 if all(q.found for q in app.quiz_countries()):
                     where = app.place() if app.continent else "the world"
@@ -120,20 +154,49 @@ class NamingMode(TimedMode):
                 if app.total_found() == app.total_countries():
                     self.end_game()
                 return
+        if submitted and self.kept_country is not None and self.could_be_longer(guess, self.kept_country):
+            self.kept_text = self.kept_country = None  # Enter halfway through a counted name: just clear the box
+            app.text = ""
+            return
         if submitted:
             where = f"in {app.place()}" if app.continent else "on the map"
             app.message = f"'{app.text}' is not a {app.scope.noun} {where}."
             app.text = ""
 
     def could_be_longer(self, guess, country):
-        """True if guess is also the start of another country you still have to name (niger -> nigeria)."""
-        return any(other is not country and not other.found
-                   and any(name.startswith(guess) and len(name) > len(guess) for name in other.accepted)
-                   for other in self.app.quiz_countries())
+        """True if guess is the start of a longer name you might be typing: country's own name ("marshall is" ->
+        "marshall islands") or the name of a country you still have to name ("niger" -> "nigeria").
+
+        Only displayed names count, not formal ones from the map data ("Gabonese Republic"), or typing "Gabon"
+        and then "Ethiopia" would look like the start of "gabone..."."""
+        return any(len(name) > len(guess) and name.startswith(guess)
+                   for name in self.names_in_progress(country))
+
+    def names_in_progress(self, country):
+        """Names the answer box could still be heading for: country's own and every country not named yet."""
+        return [normalize(c.name) for c in self.app.quiz_countries() if c is country or not c.found]
 
     def accept_suggestion(self):
         # Picking a suggestion with Tab is a clear choice, even "Niger" while Nigeria is still left.
         self.check_answer(submitted=True)
+
+    def after_reset(self):
+        self.kept_text = self.kept_country = None
+
+    def add_letter(self, text, letter):
+        """After a kept answer ("Niger"), a letter that can't lead to another name starts the next answer."""
+        if self.kept_text is not None and text == self.kept_text:
+            prefix = normalize(text + letter)
+            if not any(name.startswith(prefix) for name in self.names_in_progress(self.kept_country)):
+                self.kept_text = self.kept_country = None  # moving on: the kept answer stays counted
+                return letter
+        return text + letter
+
+    def answer_names(self, c):
+        """The name, plus endings of it that are accepted too ("Micronesia" for Federated States of Micronesia)."""
+        words = c.name.split()
+        return [c.name] + [" ".join(words[i:]) for i in range(1, len(words))
+                           if normalize(" ".join(words[i:])) in c.accepted]
 
     # ---------- end of game ----------
     def end_message(self, done):
@@ -158,6 +221,20 @@ class NamingMode(TimedMode):
     def draw_zoomed(self):
         self.app.draw_labels()
         self.draw_continent_panel()
+        self.draw_hint()
+
+    def draw_hint(self):
+        """The clicked country lights up, with "Starts with K" next to it."""
+        app, c = self.app, self.hint
+        if c is None or c.found or app.time_up or app.show_missed:
+            return
+        app.draw_country_highlight(c, LAND_HOVER)
+        name = c.name[4:] if c.name.startswith("The ") else c.name
+        text = app.font.render(f"Starts with {name[0].upper()}", True, TEXT)
+        near = app.cont_view.project_ring([c.label_pt])[0]
+        card = app.learn_card(text.get_height() + 16, text.get_width() + 28, near=near)
+        app.draw_card_background(card)
+        app.screen.blit(text, text.get_rect(center=card.center))
 
     def draw_world_panel(self):
         app = self.app

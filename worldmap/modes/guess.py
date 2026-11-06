@@ -25,7 +25,8 @@ class GuessMode(TimedMode):
         """What you type for state c: its name, or its capital."""
         return c.capital if self.capital else c.name
 
-    answer_name = answer_of  # for autocomplete
+    def answer_names(self, c):
+        return [self.answer_of(c)]  # for autocomplete
 
     def answers(self, c):
         return {normalize(c.capital)} if self.capital else c.accepted
@@ -157,13 +158,9 @@ class GuessMode(TimedMode):
     # ---------- end of game ----------
     def on_game_over(self):
         app = self.app
-        if self.capital:
-            # Reveal the capitals that weren't reached before time ran out, in red like the misses.
-            for c in app.guess_order[app.guess_index:]:
-                c.missed = True
-            app.guess_index = len(app.guess_order)
-            app.cont_view = View(USA_VIEW)
-            app.render_continent()
+        app.guess_index = len(app.guess_order)  # nothing highlighted any more
+        app.cont_view = View(USA_VIEW)  # the whole map, to see every state
+        super().on_game_over()
 
     def end_message(self, done):
         start = "Time's up" if self.app.time_left <= 0 else "Done"

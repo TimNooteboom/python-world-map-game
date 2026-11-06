@@ -14,9 +14,13 @@ class TimedMode(Mode):
 
     timed = True
 
-    def answer_name(self, c):
-        """What you type for c (used by autocomplete)."""
-        return c.name
+    def answer_names(self, c):
+        """What autocomplete can suggest for c."""
+        return [c.name]
+
+    def add_letter(self, text, letter):
+        """The answer box after typing a letter (the naming game can start afresh after a kept answer)."""
+        return text + letter
 
     def check_answer(self, submitted):
         """Check the answer box; `submitted` is True when Enter was pressed."""
@@ -47,7 +51,7 @@ class TimedMode(Mode):
                 app.suggest_index += 1 if event.key == pygame.K_DOWN else -1
         elif event.type == pygame.TEXTINPUT and event.text.isprintable():
             if len(app.text) < 40:
-                app.text += event.text
+                app.text = self.add_letter(app.text, event.text)
                 app.suggest_index = 0
                 self.check_answer(submitted=False)  # turn green as soon as it's spelled right
 
@@ -63,10 +67,10 @@ class TimedMode(Mode):
         for c in self.app.quiz_countries():
             if c.found or c.missed:
                 continue
-            name = self.answer_name(c)
-            for name in (name, name[4:] if name.startswith("The ") else None):
-                if name and len(name) > len(typed) and fold(name).startswith(typed):
-                    matches.add(name)
+            for name in self.answer_names(c):
+                for option in (name, name[4:] if name.startswith("The ") else None):
+                    if option and len(option) > len(typed) and fold(option).startswith(typed):
+                        matches.add(option)
         return sorted(matches, key=lambda n: (len(n), n))
 
     # ---------- start over / end ----------
@@ -117,7 +121,12 @@ class TimedMode(Mode):
             app.modal = "scores"
 
     def on_game_over(self):
-        """Called when the game ends, before the scoreboard (Guess the Capital reveals the answers)."""
+        """Called when the game ends, before the scoreboard: everything not answered turns red, like a miss."""
+        app = self.app
+        for c in app.countries:
+            if c.in_quiz and c.continent in app.scope.views and not c.found:
+                c.missed = True
+        app.rerender()
 
     def end_message(self, done):
         raise NotImplementedError

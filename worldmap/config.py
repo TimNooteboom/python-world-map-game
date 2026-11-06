@@ -100,6 +100,22 @@ NE_CALLOUT_ORDER = ["Vermont", "New Hampshire", "Massachusetts", "Rhode Island",
                     "Delaware", "Maryland"]
 NE_CALLOUT_X, NE_CALLOUT_TOP, NE_CALLOUT_STEP = 1060, 205, 30  # where that column is on screen
 
+# Zoomed into Europe or Africa, countries smaller than TINY_COUNTRY_PX on screen get their tag in a column in
+# the sea, joined by a line. In each column the tags line up on x (align "right": they end there, "left": they
+# start there), between top and bottom; it takes the tiny countries whose label point is between x_from and x_to
+# ("max_px" overrides what counts as tiny for that column).
+TINY_COUNTRY_PX = 30
+CALLOUT_STEP = 26  # gap between tags in a column
+CALLOUT_COLUMNS = {
+    "Europe": [dict(x=420, align="right", top=380, bottom=660, x_from=0, x_to=720),  # the Atlantic
+               dict(x=900, align="left", top=555, bottom=665, x_from=720, x_to=WIDTH)],  # over Turkey
+    "Africa": [dict(x=330, align="right", top=200, bottom=470, x_from=0, x_to=600),  # the Atlantic
+               dict(x=960, align="left", top=260, bottom=660, x_from=600, x_to=WIDTH)],  # the Indian Ocean
+    # Central America is a narrow strip, so all of it goes out into the Pacific, west of Mexico.
+    "North America": [dict(x=600, align="right", top=464, bottom=664, x_from=0, x_to=870, max_px=50),
+                      dict(x=1100, align="left", top=374, bottom=664, x_from=870, x_to=WIDTH)],  # the Atlantic
+}
+
 # Finishing a continent in the country game moves you on to the next unfinished one, in this order.
 CONTINENT_ORDER = ["North America", "South America", "Europe", "Africa", "Asia", "Oceania"]
 

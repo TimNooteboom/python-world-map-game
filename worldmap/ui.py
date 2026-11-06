@@ -66,10 +66,10 @@ class WidgetsMixin:
         pygame.draw.rect(self.screen, BORDER, rect, 1)
 
     # ---------- cards next to the mouse (Learn modes) ----------
-    def learn_card(self, h, w=300):
-        """Rect for a Learn card of size (w, h) next to the mouse cursor, flipped to stay on the map."""
+    def learn_card(self, h, w=300, near=None):
+        """Rect for a card of size (w, h) next to the mouse cursor (or the point near), flipped to stay on the map."""
         card = pygame.Rect(0, 0, w, h)
-        mx, my = pygame.mouse.get_pos()
+        mx, my = near or pygame.mouse.get_pos()
         card.topleft = (mx + 18, my + 18)
         if card.right > WIDTH - 8:  # flip to the other side of the cursor near the edges
             card.right = mx - 18

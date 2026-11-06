@@ -103,17 +103,72 @@ class NameTests(unittest.TestCase):
         self.assertEqual(normalize("St. Kitts"), "saint kitts")
         self.assertEqual(normalize("The Gambia"), "gambia")
 
-    def test_a_name_that_starts_another_waits_for_enter(self):
+    def found(self, *names):
+        return [place(self.a, n).found for n in names]
+
+    def test_a_short_name_counts_straight_away(self):
         a = self.a
         type_text(a, "Niger")
-        self.assertFalse(place(a, "Niger").found)
-        type_text(a, "ia")
-        self.assertTrue(place(a, "Nigeria").found)
-        self.assertFalse(place(a, "Niger").found)
-        type_text(a, "Uk")
+        self.assertEqual(self.found("Niger"), [True])
+        type_text(a, "Kenya")  # straight on to the next country
+        self.assertEqual(self.found("Niger", "Kenya", "Nigeria"), [True, True, False])
+        type_text(a, "UK")
         press(a, pygame.K_RETURN)
-        self.assertTrue(place(a, "United Kingdom").found)
-        self.assertFalse(place(a, "Ukraine").found)
+        self.assertEqual(self.found("United Kingdom", "Ukraine"), [True, False])
+        self.assertEqual(a.text, "")
+
+    def test_typing_the_longer_name_does_not_count_the_short_one(self):
+        type_text(self.a, "Nigeria")
+        self.assertEqual(self.found("Niger", "Nigeria"), [False, True])
+        type_text(self.a, "Ukraine")
+        self.assertEqual(self.found("United Kingdom", "Ukraine"), [False, True])
+
+    def test_autofill_from_the_end_of_a_name(self):
+        type_text(self.a, "mic")
+        self.assertEqual(self.a.mode_obj.suggestions(), ["Micronesia"])
+        press(self.a, pygame.K_TAB)
+        self.assertEqual(self.found("Federated States of Micronesia"), [True])
+
+    def test_clicking_an_unnamed_country_gives_a_hint_once_started_and_zoomed_in(self):
+        a, m = self.a, self.a.mode_obj
+
+        def click(name):
+            pos = (a.cont_view if a.continent else a.world_view).to_screen(*place(a, name).label_pt)
+            a.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=pos))
+
+        a.zoom_in("Africa")
+        a.anim = None
+        click("Kenya")
+        self.assertIsNone(m.hint)  # not started yet
+        self.assertIn("first country", a.message)
+        type_text(a, "Egypt")  # starts the game
+        click("Kenya")
+        self.assertIs(m.hint, place(a, "Kenya"))
+        click("Kenya")
+        self.assertIsNone(m.hint)  # clicking again hides it
+        click("Egypt")
+        self.assertIsNone(m.hint)  # already named: no hint
+        a.frame(0.016)
+        a.zoom_out()
+        a.anim = None
+        self.assertIsNone(m.hint)
+
+    def test_typing_every_country_one_after_another_counts_them_all(self):
+        a = self.a
+        for continent in config.CONTINENT_VIEWS:
+            for backwards in (False, True):
+                a.mode_obj.reset_all()
+                a.zoom_in(continent)
+                a.anim = None
+                for c in sorted((c for c in a.countries if c.in_quiz and c.continent == continent),
+                                key=lambda c: c.name, reverse=backwards):
+                    type_text(a, c.name)  # straight on, without pressing Enter
+                    a.auto_zoom_out_at = None
+                missing = [c.name for c in a.countries if c.in_quiz and c.continent == continent and not c.found]
+                self.assertEqual((missing, a.text), ([], ""), continent)
+                a.zoom_out()
+                a.anim = None
+        a.mode_obj.reset_all()
 
     def test_saint_kitts_spellings(self):
         for spelling in ("st kitts", "Saint Kitts", "St. Kitts and Nevis"):
@@ -149,8 +204,27 @@ class ModeTests(unittest.TestCase):
         a.frame(config.STATE_TIME_LIMIT + 1)
         self.assertTrue(a.time_up)
         self.assertIn(a.modal, ("name", "scores"))
+        # Every state not named is shown in red, like a wrong answer.
+        self.assertTrue(place(a, "Texas").found)
+        self.assertTrue(all(c.missed for c in a.countries if c.in_quiz and not c.found))
         a.modal = None
         a.mode_obj.reset_all()
+        self.assertFalse(any(c.missed for c in a.countries))
+
+    def test_guess_games_show_what_was_left_when_time_runs_out(self):
+        a = app()
+        for key in ("us_guess", "us_guess_capital"):
+            a.set_mode(key)
+            a.mode_obj.reset_all()
+            m = a.mode_obj
+            first = m.target()
+            type_text(a, first.capital if key == "us_guess_capital" else first.name)
+            a.frame(config.STATE_TIME_LIMIT + 1)
+            self.assertTrue(first.found)
+            self.assertIsNone(m.target())  # nothing highlighted any more
+            self.assertEqual(sum(c.missed for c in a.countries), a.total_countries() - 1)
+            a.modal = None
+            a.mode_obj.reset_all()
 
     def test_guess_the_state(self):
         a = app()
@@ -170,6 +244,42 @@ class ModeTests(unittest.TestCase):
         press(a, pygame.K_RETURN)
         self.assertTrue(target.missed)
         a.mode_obj.reset_all()
+
+    def test_tiny_countries_get_their_tag_in_the_sea(self):
+        a = app()
+        a.set_mode("countries")
+        if a.continent is not None:
+            a.zoom_out()
+        a.anim = None
+        a.zoom_in("Europe")
+        a.anim = None
+        slots = a.callout_slots(a.cont_view, a.quiz_countries())
+        self.assertIn("Monaco", slots)  # tiny: in a column
+        self.assertNotIn("France", slots)  # big enough to hold its own tag
+        ys = sorted(y for x, y, align in slots.values() if x == slots["Monaco"][0])
+        self.assertTrue(all(b - a >= 26 for a, b in zip(ys, ys[1:])))  # tags in a column don't overlap
+        a.zoom_out()
+        a.anim = None
+
+    def test_name_tag_lines_do_not_cross(self):
+        from worldmap.labels import line_end, lines_cross
+        a = app()
+        a.set_mode("countries")
+        for continent in ("Europe", "Africa", "North America"):
+            if a.continent is not None:
+                a.zoom_out()
+            a.anim = None
+            a.zoom_in(continent)
+            a.anim = None
+            a.gave_up.add(continent)
+            a.show_missed = True  # every name showing
+            a.frame(0.016)
+            lines = [((ax, ay), line_end(r, (ax, ay))) for r, _, (ax, ay), _ in a.label_cache[1]
+                     if not r.collidepoint(ax, ay)]
+            crossings = [(p, q) for i, p in enumerate(lines) for q in lines[i + 1:] if lines_cross(*p, *q)]
+            self.assertEqual(crossings, [], continent)
+            a.show_missed = False
+            a.mode_obj.reset_all()
 
     def test_a_perfect_flag_round_turns_the_continent_green_and_reset_clears_it(self):
         a = app()
