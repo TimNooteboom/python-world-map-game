@@ -170,6 +170,37 @@ class NameTests(unittest.TestCase):
                 a.anim = None
         a.mode_obj.reset_all()
 
+    def test_hand_cursor_only_where_a_hint_is_available(self):
+        a, m = self.a, self.a.mode_obj
+
+        def hover(name):
+            pos = a.cont_view.to_screen(*place(a, name).label_pt)
+            a.handle_event(pygame.event.Event(pygame.MOUSEMOTION, pos=pos, rel=(0, 0), buttons=(0, 0, 0)))
+            return m.wants_hand()
+
+        a.zoom_in("Africa")
+        a.anim = None
+        self.assertFalse(hover("Kenya"))  # the game hasn't started
+        type_text(a, "Egypt")
+        self.assertTrue(hover("Kenya"))
+        self.assertFalse(hover("Egypt"))  # already named
+        a.zoom_out()
+        a.anim = None
+
+    def test_the_hint_card_has_an_x_to_close_it(self):
+        a, m = self.a, self.a.mode_obj
+        a.zoom_in("Africa")
+        a.anim = None
+        type_text(a, "Egypt")
+        pos = a.cont_view.to_screen(*place(a, "Kenya").label_pt)
+        a.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=pos))
+        a.frame(0.016)  # draws the card and its x
+        self.assertIs(m.hint, place(a, "Kenya"))
+        a.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=m.close_rect.center))
+        self.assertIsNone(m.hint)
+        a.zoom_out()
+        a.anim = None
+
     def test_saint_kitts_spellings(self):
         for spelling in ("st kitts", "Saint Kitts", "St. Kitts and Nevis"):
             place(self.a, "Saint Kitts and Nevis").found = False
@@ -279,6 +310,29 @@ class ModeTests(unittest.TestCase):
             crossings = [(p, q) for i, p in enumerate(lines) for q in lines[i + 1:] if lines_cross(*p, *q)]
             self.assertEqual(crossings, [], continent)
             a.show_missed = False
+            a.mode_obj.reset_all()
+
+    def test_guess_games_hint_at_the_highlighted_state(self):
+        a = app()
+        for key in ("us_guess", "us_guess_capital"):
+            a.set_mode(key)
+            a.mode_obj.reset_all()
+            m = a.mode_obj
+            capital = key == "us_guess_capital"
+            first = m.target()
+            pos = a.cont_view.to_screen(*first.label_pt)
+            a.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=pos))
+            self.assertIs(m.hint, first)  # hints work from the very first state
+            type_text(a, first.capital if capital else first.name)
+            target = m.target()
+            other = next(c for c in a.countries if c.in_quiz and c is not target and not c.found)
+            for c, expected in ((other, None), (target, target)):
+                pos = a.cont_view.to_screen(*c.label_pt)
+                a.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=pos))
+                self.assertIs(m.hint, expected)
+            a.frame(0.016)  # draws "Starts with ..."
+            type_text(a, target.capital if capital else target.name)
+            self.assertIsNone(m.hint)  # the next state needs its own hint
             a.mode_obj.reset_all()
 
     def test_a_perfect_flag_round_turns_the_continent_green_and_reset_clears_it(self):

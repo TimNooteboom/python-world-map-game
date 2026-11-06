@@ -36,6 +36,9 @@ The timed games (Countries, States, Guess the State and Guess the Capital) each 
 
 - Names autocomplete after 3 letters. Press **Tab** or **→** to accept a suggestion, and **↑/↓** to see others.
 - The timer starts with your first answer.
+- Stuck? Click a country or state you haven't named yet to see its first letter. In the Countries and States
+  games this works once you've named your first one; in Guess the State and Guess the Capital, click the blue
+  state any time.
 - In Guess the State and Guess the Capital, press **Space** before typing to come back to a state later. Small
   northeastern states get a **Zoom in** button.
 

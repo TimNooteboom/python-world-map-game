@@ -79,5 +79,9 @@ class Mode:
         """True if the top-right Reset button (flag and capital games) is showing."""
         return False
 
+    def wants_hand(self):
+        """True to show the hand cursor (the mouse is over something clickable, like a hint)."""
+        return False
+
     def reset_progress(self):
         """What the Reset button does (only called when show_reset() is True)."""

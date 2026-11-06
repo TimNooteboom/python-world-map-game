@@ -66,6 +66,7 @@ class App(WidgetsMixin, LabelsMixin, ScoreboardMixin, MenuMixin):
         self.flag_reset_btn = Button("Reset", (WIDTH - 200, 14, 180, 40))  # flag / capital games
         self.perfect = load_progress()  # continents with every flag / capital right: green on the map
         self.flag_cache = {}
+        self.hand_cursor = False  # showing the hand (link) cursor instead of the arrow
 
         self.render_world()
 
@@ -340,4 +341,15 @@ class App(WidgetsMixin, LabelsMixin, ScoreboardMixin, MenuMixin):
             self.draw_name_entry()
         elif self.modal in ("scores", "leaderboard"):
             self.draw_scoreboard()
+        self.update_cursor()
         pygame.display.flip()
+
+    def update_cursor(self):
+        """The hand cursor while the mouse is over something clickable (a hint), otherwise the arrow."""
+        hand = not self.anim and not self.modal and not self.menu_open and self.mode_obj.wants_hand()
+        if hand != self.hand_cursor:
+            self.hand_cursor = hand
+            try:
+                pygame.mouse.set_system_cursor(pygame.SYSTEM_CURSOR_HAND if hand else pygame.SYSTEM_CURSOR_ARROW)
+            except pygame.error:
+                pass  # no cursors (e.g. the tests' hidden window)

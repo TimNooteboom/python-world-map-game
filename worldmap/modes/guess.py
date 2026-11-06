@@ -31,6 +31,19 @@ class GuessMode(TimedMode):
     def answers(self, c):
         return {normalize(c.capital)} if self.capital else c.accepted
 
+    highlight_hint = False  # the state is already blue
+
+    def hintable(self, c):
+        """Only the highlighted state."""
+        return c is self.target()
+
+    def hints_available(self):
+        """From the very first state (the naming games wait for your first answer)."""
+        return not self.app.time_up
+
+    def hint_answer(self, c):
+        return self.answer_of(c)  # its name, or its capital
+
     def label_text(self, c):
         return c.capital if self.capital else c.short_name  # Guess the Capital labels states with their capital
 
@@ -44,7 +57,7 @@ class GuessMode(TimedMode):
             self.new_order()
             app.render_continent()
         what = "capital" if self.capital else "name"
-        app.message = f"Type the blue state's {what}. Press Space to come back to it later."
+        app.message = f"Type the blue state's {what}. Click it for a hint. Space: come back later."
 
     def new_order(self):
         app = self.app
@@ -104,6 +117,7 @@ class GuessMode(TimedMode):
             app.message = self.reveal("Skipped")
         app.timer_started = True
         app.text = ""
+        self.hint = None  # a new state: its hint has to be asked for again
         app.guess_index += 1
         self.update_ne_zoom()
         app.render_continent()
@@ -118,6 +132,7 @@ class GuessMode(TimedMode):
             return
         target = app.guess_order.pop(app.guess_index)
         app.guess_order.append(target)
+        self.hint = None
         app.message = "Coming back to that one later."
         self.update_ne_zoom()
         app.render_continent()
@@ -148,6 +163,10 @@ class GuessMode(TimedMode):
                 self.next_guess(skipped=True)
         elif clicked and self.ne_zoom_available() and self.zoom_btn.rect.collidepoint(event.pos):
             self.set_ne_zoom(not app.ne_zoomed())
+        elif event.type == pygame.MOUSEMOTION:
+            self.hover_hint = self.hint_at(event.pos)
+        elif clicked:
+            self.click_for_hint(event.pos)
         elif event.type == pygame.TEXTINPUT and event.text == " " and not app.text:
             # Space before typing anything: come back to this state later (spaces inside names still work).
             if not app.time_up:
@@ -175,6 +194,7 @@ class GuessMode(TimedMode):
     def draw_zoomed(self):
         self.app.draw_labels()
         self.draw_panel()
+        self.draw_hint()
 
     def draw_panel(self):
         app = self.app

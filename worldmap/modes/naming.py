@@ -2,7 +2,7 @@
 
 import pygame
 
-from ..config import CONTINENT_ORDER, FOUND, LAND, LAND_HOVER, MAP_H, MISSED, TEXT, TEXT_DIM, WIDTH
+from ..config import CONTINENT_ORDER, FOUND, LAND, MAP_H, MISSED, TEXT, TEXT_DIM, WIDTH
 from ..data import normalize
 from ..storage import score_count
 from ..ui import Button, fmt_time
@@ -16,12 +16,18 @@ class NamingMode(TimedMode):
         self.giveup_btn = Button("Give up", (WIDTH - 150, MAP_H + 20, 130, 36))
         # A counted answer left in the box because a longer name starts with it ("Niger" -> "Nigeria").
         self.kept_text = self.kept_country = None
-        self.hint = None  # unnamed country you clicked: its first letter is shown as a hint
 
     # ---------- switching / per frame ----------
     def enter(self):
+        self.app.message = self.intro()
+
+    def on_zoom_in(self):
+        self.app.message = self.intro()
+
+    def intro(self):
+        """The help line under the answer box."""
         app = self.app
-        app.message = f"Name the {app.scope.nouns} of {app.place()}!"
+        return f"Name the {app.scope.nouns} of {app.place()}! Click a {app.scope.noun} for a hint."
 
     def update(self):
         app = self.app
@@ -70,26 +76,21 @@ class NamingMode(TimedMode):
         else:
             self.handle_typing(event)
 
-    def click_for_hint(self, pos):
-        """Zoomed in: clicking an unnamed country shows its first letter (once the game has started).
-        Clicking it again, or anywhere else, hides the hint."""
-        app = self.app
-        if not app.timer_started:
-            app.message = f"Hints start once you've named your first {app.scope.noun}."
-            return
-        hit = app.country_at(pos, app.cont_view, app.continent_dots)
-        if hit and hit.in_quiz and not hit.found and hit.continent == app.continent and hit is not self.hint:
-            self.hint = hit
-        else:
-            self.hint = None
+    def hintable(self, c):
+        """Zoomed in: any country of this continent you haven't named yet."""
+        return c.in_quiz and not c.found and c.continent == self.app.continent
 
-    def reset(self):
-        super().reset()
-        self.hint = None
+    def click_for_hint(self, pos):
+        if not self.app.timer_started and self.app.country_at(pos, self.app.cont_view, self.app.continent_dots):
+            self.app.message = f"Hints start once you've named your first {self.app.scope.noun}."
+            return
+        super().click_for_hint(pos)
 
     def handle_event(self, event):
         app = self.app
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+        if event.type == pygame.MOUSEMOTION:
+            self.hover_hint = self.hint_at(event.pos)
+        elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             if app.scope.has_world:
                 app.zoom_out()
         elif (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and app.game_started()
@@ -222,19 +223,6 @@ class NamingMode(TimedMode):
         self.app.draw_labels()
         self.draw_continent_panel()
         self.draw_hint()
-
-    def draw_hint(self):
-        """The clicked country lights up, with "Starts with K" next to it."""
-        app, c = self.app, self.hint
-        if c is None or c.found or app.time_up or app.show_missed:
-            return
-        app.draw_country_highlight(c, LAND_HOVER)
-        name = c.name[4:] if c.name.startswith("The ") else c.name
-        text = app.font.render(f"Starts with {name[0].upper()}", True, TEXT)
-        near = app.cont_view.project_ring([c.label_pt])[0]
-        card = app.learn_card(text.get_height() + 16, text.get_width() + 28, near=near)
-        app.draw_card_background(card)
-        app.screen.blit(text, text.get_rect(center=card.center))
 
     def draw_world_panel(self):
         app = self.app
