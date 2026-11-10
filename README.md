@@ -1,4 +1,4 @@
-# World Map Game
+# Map Game
 
 A geography quiz game in Python and pygame. Name every country in the world against the clock, learn flags and
 capitals, or switch to the USA and test yourself on the 50 states.
@@ -7,7 +7,9 @@ capitals, or switch to the USA and test yourself on the 50 states.
 
 ## Modes
 
-Pick a mode from the **Modes** menu in the top-left corner.
+The game opens on a start screen: click **World** for the Countries Game or **USA** for Guess the State.
+After that, pick any mode from the **Modes** menu in the top-left corner, or click **Home** to return to the
+start screen (your game in progress is kept, and its clock pauses).
 
 **World**
 
@@ -36,9 +38,9 @@ The timed games (Countries, States, Guess the State and Guess the Capital) each 
 
 - Names autocomplete after 3 letters. Press **Tab** or **→** to accept a suggestion, and **↑/↓** to see others.
 - The timer starts with your first answer.
-- Stuck? Click a country or state you haven't named yet to see its first letter. In the Countries and States
-  games this works once you've named your first one; in Guess the State and Guess the Capital, click the blue
-  state any time.
+- Stuck? Click a country or state you haven't named yet to see its first letter. In the Countries game this
+  works once you've named your first country; in the States game any time; in Guess the State and Guess the
+  Capital, click the blue state any time.
 - In Guess the State and Guess the Capital, press **Space** before typing to come back to a state later. Small
   northeastern states get a **Zoom in** button.
 
@@ -63,6 +65,7 @@ python world_map.py
 | `storage.py` | Scoreboards and flag/capital progress |
 | `scope.py` | One map you play on (the world or the USA) and its game in progress |
 | `ui.py`, `labels.py`, `scoreboard.py`, `menu.py` | Buttons, cards, the timer, name tags, the Top 10 screens, the Modes menu |
+| `splash.py` | The start screen with the World and USA tiles, and the Home button that returns to it |
 | `app.py` | The window, main loop, zooming and switching modes |
 | `modes/` | One class per kind of mode: `naming.py` (Countries/States game), `guess.py` (Guess the State/Capital), `quiz.py` (multiple choice), `learn.py` (Learn modes) |
 
@@ -77,8 +80,12 @@ save files. They save to a temporary folder, so your own scores are never touche
 
 ## Build a Windows .exe
 
-On a Windows PC with Python installed, double-click `build_windows.bat`. It installs what it needs and builds
-`dist\World Map Game.exe`, a single file you can share. Windows may show "Windows protected your PC" the first time:
+**Without a PC:** on GitHub, open the **Actions** tab, pick **Build Windows game** and click **Run workflow**.
+After a few minutes `Map Game.exe` appears on the
+[Releases page](https://github.com/TimNooteboom/python-world-map-game/releases/latest), ready to share.
+
+**On a Windows PC** with Python installed, double-click `build_windows.bat`. It installs what it needs and builds
+`dist\Map Game.exe`, a single file you can share. Windows may show "Windows protected your PC" the first time:
 click **More info → Run anyway**.
 
 ## Credits

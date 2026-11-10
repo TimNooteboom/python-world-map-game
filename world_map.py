@@ -1,4 +1,4 @@
-"""World Map Game: a geography quiz. Run with:  python world_map.py
+"""Map Game: a geography quiz. Run with:  python world_map.py
 
 Click a continent to zoom in, then type the names of its countries; each one you get turns green.
 The "Modes" menu (top left) switches between:

@@ -15,15 +15,16 @@ from .menu import MenuMixin
 from .modes import build_modes
 from .scope import build_scopes, scope_attributes
 from .scoreboard import ScoreboardMixin
+from .splash import SplashMixin
 from .storage import load_progress
 from .ui import Button, WidgetsMixin
 
 
 @scope_attributes  # app.continent, app.time_left, ... are the current scope's (see scope.SCOPE_ATTRS)
-class App(WidgetsMixin, LabelsMixin, ScoreboardMixin, MenuMixin):
+class App(WidgetsMixin, LabelsMixin, ScoreboardMixin, MenuMixin, SplashMixin):
     def __init__(self):
         pygame.init()
-        pygame.display.set_caption("World Map Game")
+        pygame.display.set_caption("Map Game")
         pygame.key.set_repeat(400, 35)  # holding a key (e.g. backspace) repeats it
         # SCALED: draw at WIDTH x HEIGHT and let pygame stretch it to the window (mouse is mapped too).
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.SCALED | pygame.RESIZABLE)
@@ -60,8 +61,9 @@ class App(WidgetsMixin, LabelsMixin, ScoreboardMixin, MenuMixin):
         self.mode_obj = self.modes["countries"]  # the current mode
         self.menu_open = False
         self.menu_group = None  # menu group expanded to show Learn / Game (a group key in MENU)
-        self.modes_btn = Button("Modes", (20, 14, 130, 40))
-        self.leaderboard_btn = Button("Leaderboard", (160, 14, 160, 40))  # timed games only
+        self.home_btn = Button("Home", (20, 14, 90, 40))  # back to the start screen
+        self.modes_btn = Button("Modes", (120, 14, 130, 40))
+        self.leaderboard_btn = Button("Leaderboard", (260, 14, 160, 40))  # timed games only
         self.lb_close_btn = Button("Close", (self.card.centerx - 70, self.card.bottom - 60, 140, 40))
         self.flag_reset_btn = Button("Reset", (WIDTH - 200, 14, 180, 40))  # flag / capital games
         self.perfect = load_progress()  # continents with every flag / capital right: green on the map
@@ -69,6 +71,7 @@ class App(WidgetsMixin, LabelsMixin, ScoreboardMixin, MenuMixin):
         self.hand_cursor = False  # showing the hand (link) cursor instead of the arrow
 
         self.render_world()
+        self.setup_splash()  # the start screen: pick the world or the USA
 
     @property
     def mode(self):
@@ -125,7 +128,7 @@ class App(WidgetsMixin, LabelsMixin, ScoreboardMixin, MenuMixin):
 
     def timer_paused(self):
         # The clock stops while the missed countries' names are on screen, or in the untimed modes.
-        return (not self.mode_obj.timed or self.modal == "leaderboard"
+        return (self.splash or not self.mode_obj.timed or self.modal == "leaderboard"
                 or (self.continent is not None and self.show_missed))
 
     def update_timer(self, dt):
@@ -278,6 +281,9 @@ class App(WidgetsMixin, LabelsMixin, ScoreboardMixin, MenuMixin):
         self.mode_obj.update()
 
     def handle_event(self, event):
+        if self.splash:
+            self.handle_splash_event(event)
+            return
         if self.modal:
             self.handle_modal_event(event)
             return
@@ -291,9 +297,12 @@ class App(WidgetsMixin, LabelsMixin, ScoreboardMixin, MenuMixin):
             self.mode_obj.handle_event(event)
 
     def handle_top_button(self, event):
-        """Leaderboard (timed games) and Reset (flag / capital games) buttons. True if clicked."""
+        """Home, Leaderboard (timed games) and Reset (flag / capital games) buttons. True if clicked."""
         if event.type != pygame.MOUSEBUTTONDOWN or event.button != 1:
             return False
+        if self.home_btn.rect.collidepoint(event.pos):
+            self.go_home()
+            return True
         if self.mode_obj.timed and self.leaderboard_btn.rect.collidepoint(event.pos):
             self.modal = "leaderboard"
             return True
@@ -308,6 +317,11 @@ class App(WidgetsMixin, LabelsMixin, ScoreboardMixin, MenuMixin):
         return False
 
     def draw(self):
+        if self.splash:
+            self.draw_splash()
+            self.update_cursor()
+            pygame.display.flip()
+            return
         self.screen.fill(PANEL)
         if self.anim:
             self.draw_animation()
@@ -326,6 +340,7 @@ class App(WidgetsMixin, LabelsMixin, ScoreboardMixin, MenuMixin):
                 confirm = pygame.time.get_ticks() < self.reset_confirm_until
                 self.flag_reset_btn.text = "Confirm?" if confirm else "Reset"
                 self.flag_reset_btn.draw(self.screen, self.font)
+            self.home_btn.draw(self.screen, self.font)
             self.draw_modes_menu()
         if not self.anim and self.mode_obj.timed:
             self.draw_timer()
@@ -346,7 +361,10 @@ class App(WidgetsMixin, LabelsMixin, ScoreboardMixin, MenuMixin):
 
     def update_cursor(self):
         """The hand cursor while the mouse is over something clickable (a hint), otherwise the arrow."""
-        hand = not self.anim and not self.modal and not self.menu_open and self.mode_obj.wants_hand()
+        if self.splash:
+            hand = self.splash_wants_hand()
+        else:
+            hand = not self.anim and not self.modal and not self.menu_open and self.mode_obj.wants_hand()
         if hand != self.hand_cursor:
             self.hand_cursor = hand
             try:

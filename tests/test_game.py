@@ -31,6 +31,7 @@ def app():
     global APP
     if APP is None:
         APP = App()
+        APP.splash = False  # past the start screen (test_splash_screen goes back to it)
     return APP
 
 
@@ -311,6 +312,54 @@ class ModeTests(unittest.TestCase):
             self.assertEqual(crossings, [], continent)
             a.show_missed = False
             a.mode_obj.reset_all()
+
+    def test_splash_screen(self):
+        a = app()
+        for key, index in (("countries", 0), ("us_guess", 1)):
+            a.set_mode("flags_learn")
+            a.splash = True
+            a.frame(0.016)  # draws the start screen
+            a.handle_event(pygame.event.Event(pygame.TEXTINPUT, text="x"))  # ignored on the start screen
+            self.assertEqual(a.text, "")
+            a.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=(5, 5)))  # not on a tile
+            self.assertTrue(a.splash)
+            rect = a.splash_tiles[index][3]
+            a.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=rect.center))
+            self.assertFalse(a.splash)
+            self.assertEqual(a.mode, key)
+            a.frame(0.016)
+
+    def test_home_button_returns_to_the_start_screen_and_pauses_the_clock(self):
+        a = app()
+        a.set_mode("countries")
+        a.mode_obj.reset_all()
+        a.zoom_in("Europe")
+        a.anim = None
+        type_text(a, "France")  # starts the clock
+        self.assertTrue(a.timer_started)
+        a.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=a.home_btn.rect.center))
+        self.assertTrue(a.splash)
+        left = a.time_left
+        a.frame(5)
+        self.assertEqual(a.time_left, left)  # paused on the start screen
+        a.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=a.splash_tiles[0][3].center))
+        self.assertFalse(a.splash)
+        self.assertTrue(place(a, "France").found)  # the game in progress is still there
+        a.mode_obj.reset_all()
+        a.splash = False
+
+    def test_states_game_hints_before_the_first_answer(self):
+        a = app()
+        a.set_mode("states")
+        a.mode_obj.reset_all()
+        m = a.mode_obj
+        texas = place(a, "Texas")
+        pos = a.cont_view.to_screen(*texas.label_pt)
+        a.handle_event(pygame.event.Event(pygame.MOUSEMOTION, pos=pos, rel=(0, 0), buttons=(0, 0, 0)))
+        self.assertTrue(m.wants_hand())
+        a.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=pos))
+        self.assertIs(m.hint, texas)
+        self.assertFalse(a.timer_started)  # a hint doesn't start the clock
 
     def test_guess_games_hint_at_the_highlighted_state(self):
         a = app()

@@ -27,7 +27,8 @@ class NamingMode(TimedMode):
     def intro(self):
         """The help line under the answer box."""
         app = self.app
-        return f"Name the {app.scope.nouns} of {app.place()}! Click a {app.scope.noun} for a hint."
+        fast = "" if app.scope.has_world else " as fast as you can"  # the States game
+        return f"Name the {app.scope.nouns} of {app.place()}{fast}! Click a {app.scope.noun} for a hint."
 
     def update(self):
         app = self.app
@@ -80,8 +81,16 @@ class NamingMode(TimedMode):
         """Zoomed in: any country of this continent you haven't named yet."""
         return c.in_quiz and not c.found and c.continent == self.app.continent
 
+    def hints_available(self):
+        """The States game gives hints from the start; the Countries game once you've named your first country."""
+        app = self.app
+        if app.scope.has_world:
+            return super().hints_available()
+        return not app.time_up and not app.show_missed
+
     def click_for_hint(self, pos):
-        if not self.app.timer_started and self.app.country_at(pos, self.app.cont_view, self.app.continent_dots):
+        if (not self.hints_available() and not self.app.timer_started
+                and self.app.country_at(pos, self.app.cont_view, self.app.continent_dots)):
             self.app.message = f"Hints start once you've named your first {self.app.scope.noun}."
             return
         super().click_for_hint(pos)

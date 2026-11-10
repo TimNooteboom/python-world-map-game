@@ -23,7 +23,7 @@ def save_dir():
         base = os.environ.get("APPDATA", os.path.expanduser("~"))
     else:
         base = os.environ.get("XDG_DATA_HOME", os.path.expanduser("~/.local/share"))
-    path = os.path.join(base, "World Map Game")
+    path = os.path.join(base, "World Map Game")  # the game's old name: kept so saved scores carry over
     os.makedirs(path, exist_ok=True)
     return path
 

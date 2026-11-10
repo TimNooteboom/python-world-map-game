@@ -1,4 +1,4 @@
-"""World Map Game: a geography quiz in pygame.
+"""Map Game: a geography quiz in pygame.
 
 Modules:
     config      sizes, colors, map views, time limits, file paths, the list of modes

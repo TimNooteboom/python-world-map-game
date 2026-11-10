@@ -1,0 +1,44 @@
+# Builds "Map Game.exe" on a Windows machine at GitHub and publishes it as a release.
+# Run it from the repo's Actions tab: "Build Windows game" -> "Run workflow".
+# Friends download it from https://github.com/TimNooteboom/python-world-map-game/releases/latest
+name: Build Windows game
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write  # to create the release
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: python -m pip install pygame-ce pyinstaller
+
+      - name: Test
+        run: python -m unittest discover tests
+        env:
+          SDL_VIDEODRIVER: dummy
+          SDL_AUDIODRIVER: dummy
+
+      - name: Build
+        run: >
+          pyinstaller --noconfirm --windowed --onefile --name "Map Game"
+          --add-data "countries.geojson;." --add-data "capitals.json;." --add-data "us_states.geojson;."
+          --add-data "flags;flags" world_map.py
+
+      - name: Publish release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v$(date -u +%Y.%m.%d-%H%M)"
+          gh release create "$tag" "dist/Map Game.exe" --title "Map Game $tag" --notes \
+            "Download **Map Game.exe** below and double-click it. If Windows shows \"Windows protected your PC\", click **More info → Run anyway**."

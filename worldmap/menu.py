@@ -2,7 +2,10 @@
 
 import pygame
 
-from .config import FOUND, MENU, PANEL, TEXT, TEXT_DIM
+from .config import MENU, PANEL, TEXT, TEXT_DIM
+
+ROW_HOVER = (70, 76, 88)  # a row under the mouse, and the current mode's row
+ROW_HOVER_CURRENT = (90, 98, 112)  # the current mode's row under the mouse
 
 
 class MenuMixin:
@@ -68,15 +71,15 @@ class MenuMixin:
                 text = self.label_font.render(label, True, TEXT_DIM)
                 self.screen.blit(text, text.get_rect(midleft=(rect.x + 12, rect.centery + 3)))
                 continue
+            # The current mode's row (or its group's, while the group is closed) is lit like a row under the mouse.
+            current = ((kind == "mode" and key == self.mode)
+                       or (kind == "group" and key == self.mode_group() and self.menu_group != key))
             if rect.collidepoint(mouse):
-                pygame.draw.rect(self.screen, (70, 76, 88), rect, border_radius=6)
+                pygame.draw.rect(self.screen, ROW_HOVER_CURRENT if current else ROW_HOVER, rect, border_radius=6)
+            elif current:
+                pygame.draw.rect(self.screen, ROW_HOVER, rect, border_radius=6)
             text = self.font.render(label, True, TEXT)
             self.screen.blit(text, text.get_rect(midleft=(rect.x + (16 if kind == "group" else 44), rect.centery)))
-            # Green dot on the current mode (on its group while the group is closed).
-            if kind == "mode" and key == self.mode:
-                pygame.draw.circle(self.screen, FOUND, (rect.x + 30, rect.centery), 5)
-            elif kind == "group" and key == self.mode_group() and self.menu_group != key:
-                pygame.draw.circle(self.screen, FOUND, (rect.right - 12, rect.centery), 5)
             if kind == "group":  # little arrow: right when closed, down when open
                 cx, cy = rect.right - 34, rect.centery
                 pts = ([(cx - 5, cy - 3), (cx + 5, cy - 3), (cx, cy + 4)] if self.menu_group == key
