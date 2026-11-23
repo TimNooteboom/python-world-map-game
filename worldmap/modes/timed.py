@@ -6,7 +6,6 @@ import pygame
 
 from ..config import LAND_HOVER, TEXT, TEXT_DIM
 from ..data import fold
-from ..storage import load_scores, makes_top_10
 from .base import Mode
 
 
@@ -196,6 +195,9 @@ class TimedMode(Mode):
     def after_reset(self):
         """Extra things to reset (Guess the State: a new order of states)."""
 
+    def board(self):
+        return self.app.scope.board
+
     def end_game(self):
         """Lock the game and ask for a name to put on the scoreboard (if the score makes the top 10)."""
         app = self.app
@@ -204,16 +206,10 @@ class TimedMode(Mode):
         done = app.total_found()
         # Saved to a tenth of a second (cut off, not rounded, so it never shows more than the clock did).
         elapsed = app.scope.time_limit - app.time_left
-        app.result = {app.scope.score_field: done, "seconds": math.floor(elapsed * 10) / 10}
+        result = {self.board().field: done, "seconds": math.floor(elapsed * 10) / 10}
         self.on_game_over()
         app.message = self.end_message(done)
-        scores, last_name = load_scores(*app.scope.score_files)
-        if makes_top_10(app.result, scores):
-            app.name_text = last_name
-            app.modal = "name"  # made the top 10: ask for a name
-        else:
-            app.new_score = dict(app.result)  # not saved; the scoreboard says it didn't make the top 10
-            app.modal = "scores"
+        app.offer_score(result)
 
     def on_game_over(self):
         """Called when the game ends, before the scoreboard: everything not answered turns red, like a miss."""

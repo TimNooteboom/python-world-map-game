@@ -5,7 +5,7 @@ import time
 import pygame
 
 from .config import FOUND, HEIGHT, PANEL, TEXT, TEXT_DIM, WIDTH
-from .storage import load_scores, save_scores, score_count
+from .storage import load_scores, makes_top_10, save_scores, score_count
 from .ui import fmt_date, fmt_time
 
 
@@ -43,13 +43,24 @@ class ScoreboardMixin:
             if key or (clicked and self.lb_close_btn.rect.collidepoint(event.pos)):
                 self.modal = None
 
+    def offer_score(self, result):
+        """A game has ended with this result: ask for a name if it makes the top 10, else show the scoreboard."""
+        self.result = result
+        scores, last_name = load_scores(*self.mode_obj.board().files)
+        if makes_top_10(result, scores):
+            self.name_text = last_name
+            self.modal = "name"  # made the top 10: ask for a name
+        else:
+            self.new_score = dict(result)  # not saved; the scoreboard says it didn't make the top 10
+            self.modal = "scores"
+
     def submit_score(self, save):
         if save and self.name_text.strip():
-            scores, _ = load_scores(*self.scope.score_files)
+            scores, _ = load_scores(*self.mode_obj.board().files)
             self.new_score = dict(self.result, name=self.name_text.strip(),
                                   date=time.strftime("%Y-%m-%d"))
             # Only the top 10 are kept; a score that doesn't make it is still shown as "didn't make the top 10".
-            self.save_failed = not save_scores(self.scope.score_files[0], scores + [self.new_score],
+            self.save_failed = not save_scores(self.mode_obj.board().files[0], scores + [self.new_score],
                                                self.name_text.strip())
         self.modal = "scores"
 
@@ -85,11 +96,15 @@ class ScoreboardMixin:
 
     def draw_scoreboard(self):
         card = self.draw_card(self.card.h)
-        top, _ = load_scores(*self.scope.score_files)
-        title = self.big.render(self.scope.board_title, True, TEXT)
+        board = self.mode_obj.board()
+        top, _ = load_scores(*board.files)
+        # The latest score, if it's from this board (the States game and State Flags share the USA map, and so
+        # its latest score).
+        latest = self.new_score if self.new_score and board.field in self.new_score else None
+        title = self.big.render(board.title, True, TEXT)
         self.screen.blit(title, title.get_rect(midtop=(card.centerx, card.y + 22)))
 
-        cols = [(card.x + 40, "#"), (card.x + 90, "Name"), (card.x + 270, self.scope.score_label),
+        cols = [(card.x + 40, "#"), (card.x + 90, "Name"), (card.x + 270, board.label),
                 (card.x + 385, "Time"), (card.x + 465, "Date")]
         y = card.y + 80
         for x, head in cols:
@@ -99,7 +114,7 @@ class ScoreboardMixin:
             msg = self.font.render("No scores saved yet.", True, TEXT_DIM)
             self.screen.blit(msg, msg.get_rect(midtop=(card.centerx, y + 20)))
         for i, sc in enumerate(top, 1):
-            mine = sc == self.new_score
+            mine = sc == latest
             if mine:
                 pygame.draw.rect(self.screen, (60, 90, 70), (card.x + 28, y - 4, card.w - 56, 32), border_radius=6)
             values = [str(i), sc["name"], str(score_count(sc)), fmt_time(sc["seconds"]), fmt_date(sc.get("date", ""))]
@@ -107,8 +122,8 @@ class ScoreboardMixin:
                 img = self.font.render(value, True, FOUND if mine else TEXT)
                 self.screen.blit(img, (x, y), pygame.Rect(0, 0, 200, 30))
             y += 36
-        if self.new_score and self.new_score not in top:
-            score = f"{score_count(self.new_score)} in {fmt_time(self.new_score['seconds'])}"
+        if latest and latest not in top:
+            score = f"{score_count(latest)} in {fmt_time(latest['seconds'])}"
             if self.save_failed:
                 text = f"Your score ({score}) couldn't be saved: the game can't write to its folder."
             else:

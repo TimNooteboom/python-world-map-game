@@ -12,6 +12,7 @@ dist/
 /state_scores.json
 /guess_scores.json
 /capital_guess_scores.json
+/state_flag_scores.json
 /flag_progress.json
 
 # Starting scoreboards bundled into the .exe / app you build; kept on your computer, not on GitHub

@@ -1,17 +1,82 @@
 """Shared screen pieces: buttons, cards, the answer box, the timer, the title and flags."""
 
+import math
 import os
 
 import pygame
 
-from .config import (BORDER, FLAGS_DIR, FOUND, MAP_H, MISSED, OUTLINE, PANEL, TEXT, TEXT_DIM, WARNING_TIME,
-                     WIDTH)
+from .config import (BORDER, FLAG_NAME_COVERS, FLAGS_DIR, FOUND, MAP_H, MISSED, OUTLINE, PANEL, TEXT, TEXT_DIM,
+                     WARNING_TIME, WIDTH)
 
 
 def fmt_date(iso):
     """Saved dates are YYYY-MM-DD; show them as MM/DD/YYYY."""
     y, m, d = (iso.split("-") + ["", "", ""])[:3]
     return f"{m}/{d}/{y}" if d else iso
+
+
+def cover_names(img, covers):
+    """Paint over the name written on a flag (see config.FLAG_NAME_COVERS); changes img.
+
+    In each area, the letters' pixels (the text's color, or a blend of it and the background, at the letters'
+    soft edges) are repainted with the background. Anything else (a ribbon's edges, the blue around a curved
+    ribbon, a sun's rays) is left alone.
+    """
+    w, h = img.get_size()
+
+    def dist(a, b):
+        return ((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2) ** 0.5
+
+    for cover in covers:
+        if "color" in cover:
+            fill = cover["color"]
+        else:
+            fill = tuple(img.get_at((int(cover["fill"][0] * w / 100), int(cover["fill"][1] * h / 100))))[:3]
+        x0, y0, x1, y1 = cover.get("box", (0, 0, 100, 100))
+        pixels = [(x, y) for y in range(int(y0 * h / 100), min(h, int(y1 * h / 100)))
+                  for x in range(int(x0 * w / 100), min(w, int(x1 * w / 100)))]
+        if "ring" in cover:  # only the part of the box inside the ring (and between its angles)
+            cx, cy, r_in, r_out = cover["ring"]
+            cx, cy, r_in, r_out = cx * w / 100, cy * h / 100, r_in * h / 100, r_out * h / 100
+            a0, a1 = cover.get("angles", (0, 360))
+
+            def in_ring(x, y):
+                if not r_in ** 2 <= (x - cx) ** 2 + (y - cy) ** 2 <= r_out ** 2:
+                    return False
+                a = math.degrees(math.atan2(x - cx, cy - y)) % 360  # 0 at the top, clockwise
+                return a0 <= a <= a1 if a0 <= a1 else a >= a0 or a <= a1  # (a range can pass the top)
+
+            pixels = [(x, y) for x, y in pixels if in_ring(x, y)]
+        colors = [tuple(img.get_at(p))[:3] for p in pixels]
+        keep = cover.get("keep")
+        if keep:  # everything in the area except this color (the field around a ribbon) becomes the background
+            for p, c in zip(pixels, colors):
+                if dist(c, keep) > 35:
+                    img.set_at(p, fill)
+            continue
+        text = cover.get("text")
+        if text is None:  # the most common color that is clearly different from the background
+            counts = {}
+            for c in colors:
+                if dist(c, fill) > 120:
+                    counts.setdefault((c[0] // 16, c[1] // 16, c[2] // 16), []).append(c)
+            if not counts:
+                continue
+            group = max(counts.values(), key=len)
+            text = tuple(sum(c[i] for c in group) // len(group) for i in range(3))
+        span = dist(text, fill)
+        painted = set()
+        for p, c in zip(pixels, colors):
+            # On (or near) the line from the text's color to the background's: a letter or its soft edge.
+            if dist(c, text) + dist(c, fill) <= span * 1.15:
+                img.set_at(p, fill)
+                painted.add(p)
+        outline = cover.get("outline")
+        if outline:  # letters drawn with an outline: paint it too, but only right next to a letter
+            for (x, y), c in zip(pixels, colors):
+                if ((x, y) not in painted and dist(c, outline) < 90
+                        and any((x + dx, y + dy) in painted for dx in range(-2, 3) for dy in range(-2, 3))):
+                    img.set_at((x, y), fill)
 
 
 def fmt_time(seconds):
@@ -41,12 +106,18 @@ class WidgetsMixin:
         return img
 
     # ---------- flags ----------
-    def flag_image(self, country, size):
-        """The country's flag scaled to fit inside size=(w, h), keeping its shape."""
-        key = (country.code, size)
+    def flag_image(self, country, size, hide_name=False):
+        """The country's flag scaled to fit inside size=(w, h), keeping its shape.
+
+        hide_name: paint over the name written on some state flags (for the quizzes, where it gives the answer).
+        """
+        hide_name = hide_name and country.code in FLAG_NAME_COVERS
+        key = (country.code, size, hide_name)
         if key not in self.flag_cache:
             try:
                 img = pygame.image.load(os.path.join(FLAGS_DIR, country.code + ".png")).convert_alpha()
+                if hide_name:
+                    cover_names(img, FLAG_NAME_COVERS[country.code])
                 scale = min(size[0] / img.get_width(), size[1] / img.get_height())
                 img = pygame.transform.smoothscale(img, (round(img.get_width() * scale),
                                                          round(img.get_height() * scale)))
@@ -58,9 +129,9 @@ class WidgetsMixin:
             self.flag_cache[key] = img
         return self.flag_cache[key]
 
-    def draw_flag(self, country, box):
+    def draw_flag(self, country, box, hide_name=False):
         """Flag centered in a pygame.Rect, with a thin border."""
-        img = self.flag_image(country, (box.w, box.h))
+        img = self.flag_image(country, (box.w, box.h), hide_name)
         rect = img.get_rect(center=box.center)
         self.screen.blit(img, rect)
         pygame.draw.rect(self.screen, BORDER, rect, 1)

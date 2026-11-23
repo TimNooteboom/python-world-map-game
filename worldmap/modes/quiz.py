@@ -1,12 +1,14 @@
 """Multiple-choice flag and capital quizzes: the games, and the practice test in the Learn modes."""
 
+import math
 import random
 
 import pygame
 
 from ..config import FOUND, LAND_HOVER, MAP_H, MISSED, OUTLINE, PANEL, TEXT, TEXT_DIM, WIDTH
+from ..scope import STATE_FLAGS_BOARD
 from ..storage import save_progress
-from ..ui import Button
+from ..ui import Button, fmt_time
 from .base import Mode
 
 
@@ -20,6 +22,8 @@ class Quiz:
         self.picked = None  # index of the choice clicked, once answered
         self.advance_at = None  # time to move on to the next question
         self.done = False
+        self.elapsed_ms = 0  # time spent playing (not counting time with the leaderboard open)
+        self.last_tick = None
 
 
 class FactMode(Mode):
@@ -46,7 +50,18 @@ class FactMode(Mode):
     # ---------- per frame / input ----------
     def update(self):
         q = self.quiz
-        if q and q.advance_at and pygame.time.get_ticks() >= q.advance_at:
+        if not q:
+            return
+        if q.done and self.board() and not self.app.modal:
+            # The Top 10 was shown in place of the "Finished!" card: once it's closed, back to the map.
+            self.quiz = None
+            self.app.render_continent()  # green if every flag was right
+            return
+        now = pygame.time.get_ticks()
+        if q.last_tick is not None and not q.done and not self.app.modal:
+            q.elapsed_ms += now - q.last_tick
+        q.last_tick = now
+        if q.advance_at and now >= q.advance_at:
             self.next_question()
 
     def handle_event(self, event):
@@ -156,6 +171,8 @@ class FactMode(Mode):
     def draw_zoomed(self):
         if self.quiz:
             self.draw_quiz()
+            if self.board():
+                self.draw_clock()
         else:
             self.draw_explore()
         self.draw_panel()
@@ -189,7 +206,8 @@ class FactMode(Mode):
         shade.fill((20, 22, 28, 110))  # dims the map, but keeps it visible behind the question
         app.screen.blit(shade, (0, 0))
         if q.done:
-            self.draw_done()
+            if not app.modal:  # the name box / Top 10 take its place until they're closed
+                self.draw_done()
             return
 
         # The country to find, at the top of the screen.
@@ -213,8 +231,11 @@ class FactMode(Mode):
                 app.screen.blit(city, city.get_rect(center=(rect.centerx, rect.centery - 10)))
             else:
                 flag_box = pygame.Rect(rect.x + 14, rect.y + 14, rect.w - 28, rect.h - 54)
-                app.draw_flag(c, flag_box)
-            if answered:  # show whose flag / capital each one is, to learn from
+                app.draw_flag(c, flag_box, hide_name=True)  # a name on the flag would give it away
+            # Once answered, show whose flag / capital each one is, to learn from. The Flags game only names the flag
+            # you picked, so the other three stay unknown for when they come up later.
+            flags_game = not capitals and q.kind == "game"
+            if answered and (i == q.picked or not flags_game):
                 label = app.fit_text(app.small, c.name, TEXT, rect.w - 20)
                 app.screen.blit(label, label.get_rect(midbottom=(rect.centerx, rect.bottom - 10)))
             border = None
@@ -234,6 +255,8 @@ class FactMode(Mode):
                 text = "Correct!"
             elif capitals:
                 text = f"Incorrect. {wrong.capital} is the capital of {wrong.name}. The right answer is in green."
+            elif q.kind == "game":  # the Flags game doesn't say whose flag it was (it may come up later)
+                text = "Incorrect. The right flag is in green."
             else:
                 text = f"Incorrect. That's {wrong.name}. The right flag is in green."
             msg = app.fit_text(app.big if right else app.name_font, text, FOUND if right else MISSED, WIDTH - 120)
@@ -273,6 +296,11 @@ class QuizGameMode(FactMode):
     def __init__(self, app, key):
         super().__init__(app, key)
         self.start_btn = Button("Start game", (WIDTH - 200, MAP_H + 20, 180, 36))  # USA map between games
+        # State Flags (timed): a card in the middle of the map, so the clock never starts by itself.
+        self.start_card = pygame.Rect(0, 0, 640, 230)
+        self.start_card.center = (WIDTH // 2, MAP_H // 2)
+        self.big_start_btn = Button("Start", (WIDTH // 2 - 90, self.start_card.bottom - 70, 180, 46))
+        self.clock_rect = pygame.Rect(WIDTH - 200, 14, 180, 64)  # the clock during a State Flags game
 
     def progress_key(self):
         return self.app.scope.progress_prefix + self.subject
@@ -283,10 +311,16 @@ class QuizGameMode(FactMode):
 
     # ---------- switching ----------
     def enter(self):
+        if self.board():
+            return  # State Flags: wait on the start card, so the clock only starts when you click Start
         self.start_quiz("game")  # straight into this continent's (or the USA's) game
 
     def on_zoom_in(self):
         self.start_quiz("game")  # the flags appear as soon as the zoom finishes
+
+    def board(self):
+        """The State Flags game has a Top 10 (most flags right, then fastest)."""
+        return STATE_FLAGS_BOARD if self.subject == "flags" and not self.app.scope.has_world else None
 
     def on_game_done(self):
         app, q = self.app, self.quiz
@@ -294,6 +328,19 @@ class QuizGameMode(FactMode):
         if q.score == len(q.order) and app.continent not in perfect:
             perfect.add(app.continent)
             save_progress(app.perfect)
+        if self.board():
+            app.offer_score({"flags": q.score, "seconds": math.floor(q.elapsed_ms / 100) / 10})
+
+    def reset_all(self):
+        """Play again (from the scoreboard)."""
+        self.app.modal = None
+        self.app.new_score = None
+        self.start_quiz("game")
+
+    def result_text(self, result):
+        """(title, score line) for the "enter your name" card."""
+        n = len(self.quiz.order)
+        return f"All {n} flags done!", f"{result['flags']} / {n} correct in {fmt_time(result['seconds'])}"
 
     def reset_progress(self):
         """The Reset button (after its confirm click): this game's continents aren't green any more."""
@@ -322,14 +369,50 @@ class QuizGameMode(FactMode):
         app = self.app
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             app.zoom_out()
+        elif event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN, pygame.K_KP_ENTER) and self.board():
+            self.start_quiz("game")
         elif event.type == pygame.MOUSEMOTION:
             app.hover = self.learn_country_at(event.pos)
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if self.start_btn.rect.collidepoint(event.pos):
+            start = self.big_start_btn if self.board() else self.start_btn
+            if start.rect.collidepoint(event.pos):
                 self.start_quiz("game")
 
+    def draw_explore(self):
+        """State Flags, between games: the start card."""
+        if not self.board():
+            return
+        app = self.app
+        app.draw_card_background(self.start_card)
+        n = sum(c.in_quiz for c in app.countries)
+        lines = [(app.big, "State Flags Game", TEXT),
+                 (app.font, f"Pick the right flag for all {n} states, as fast as you can.", TEXT_DIM),
+                 (app.font, "The clock starts when you click Start.", TEXT_DIM)]
+        y = self.start_card.y + 24
+        for font, text, color in lines:
+            img = font.render(text, True, color)
+            app.screen.blit(img, img.get_rect(midtop=(self.start_card.centerx, y)))
+            y += img.get_height() + 10
+        # A green button, so it's clear this is what to click.
+        hover = self.big_start_btn.rect.collidepoint(pygame.mouse.get_pos())
+        pygame.draw.rect(app.screen, (95, 195, 112) if hover else FOUND, self.big_start_btn.rect, border_radius=8)
+        label = app.big.render(self.big_start_btn.text, True, TEXT)
+        app.screen.blit(label, label.get_rect(center=self.big_start_btn.rect.center))
+
+    def draw_clock(self):
+        """State Flags: the time so far, top right."""
+        app, q = self.app, self.quiz
+        box = pygame.Surface(self.clock_rect.size, pygame.SRCALPHA)
+        pygame.draw.rect(box, (*PANEL, 225), box.get_rect(), border_radius=8)
+        app.screen.blit(box, self.clock_rect)
+        tag = app.label_font.render("FINISHED" if q.done else "TIME", True, TEXT_DIM)
+        app.screen.blit(tag, tag.get_rect(midtop=(self.clock_rect.centerx, self.clock_rect.y + 7)))
+        clock = app.big.render(fmt_time(q.elapsed_ms / 1000), True, TEXT)
+        app.screen.blit(clock, clock.get_rect(midbottom=(self.clock_rect.centerx, self.clock_rect.bottom - 6)))
+
     def idle_panel(self):
-        self.start_btn.draw(self.app.screen, self.app.font)
+        if not self.board():  # State Flags has the big Start button on the map instead
+            self.start_btn.draw(self.app.screen, self.app.font)
         return f"Pick the right {self.thing} for every state. Get them all right to turn the map green!"
 
     def world_hint(self):

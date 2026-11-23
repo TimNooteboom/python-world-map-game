@@ -8,7 +8,7 @@ import json
 
 from .config import FLAG_PROGRESS_FILE
 
-SCORE_FIELDS = ("countries", "states", "capitals")  # what a saved score counts, depending on the board
+SCORE_FIELDS = ("countries", "states", "capitals", "flags")  # what a saved score counts, depending on the board
 PROGRESS_KEYS = ("flags", "capitals", "us_flags", "us_capitals")
 
 

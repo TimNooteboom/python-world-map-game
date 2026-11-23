@@ -7,7 +7,7 @@ from ..config import LAND, LAND_HOVER, MODES
 
 
 class Mode:
-    timed = False  # timer, Start over and Leaderboard (Countries, States, Guess the State / Capital)
+    timed = False  # timer and Start over (Countries, States, Guess the State / Capital)
     hover_shows_continent = True  # on the globe, hovering lights up the whole continent
 
     def __init__(self, app, key):
@@ -74,6 +74,10 @@ class Mode:
     def ne_callouts(self):
         """True if the small northeastern states' tags go in the column off the coast."""
         return False
+
+    def board(self):
+        """This game's Top 10 (a scope.Board), or None: the Leaderboard button shows when there is one."""
+        return None
 
     def show_reset(self):
         """True if the top-right Reset button (flag and capital games) is showing."""

@@ -313,6 +313,19 @@ class ModeTests(unittest.TestCase):
             a.show_missed = False
             a.mode_obj.reset_all()
 
+    def test_state_names_are_painted_off_their_flags_in_the_quiz(self):
+        a = app()
+        for code in config.FLAG_NAME_COVERS:
+            state = next(c for c in a.scopes["usa"].countries if c.code == code)
+            plain = a.flag_image(state, (218, 145))
+            hidden = a.flag_image(state, (218, 145), hide_name=True)
+            self.assertEqual(plain.get_size(), hidden.get_size())
+            changed = sum(plain.get_at((x, y)) != hidden.get_at((x, y))
+                          for x in range(0, plain.get_width(), 2) for y in range(0, plain.get_height(), 2))
+            self.assertGreater(changed, 20, code)  # the name was painted over
+        texas = next(c for c in a.scopes["usa"].countries if c.code == "us-tx")  # no name: the same image
+        self.assertIs(a.flag_image(texas, (218, 145), hide_name=True), a.flag_image(texas, (218, 145)))
+
     def test_splash_screen(self):
         a = app()
         for key, index in (("countries", 0), ("us_guess", 1)):
@@ -402,6 +415,88 @@ class ModeTests(unittest.TestCase):
         a.zoom_out()
         a.anim = None
 
+
+    def test_state_flags_game_waits_for_start(self):
+        a = app()
+        a.set_mode("flags_learn")
+        a.set_mode("us_flags_game")
+        m = a.mode_obj
+        self.assertIsNone(m.quiz)  # the start card: no clock running yet
+        a.frame(0.016)
+        a.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=m.big_start_btn.rect.center))
+        self.assertIsNotNone(m.quiz)
+        a.frame(0.016)  # the clock, top right
+        a.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=m.quit_btn.rect.center))  # Stop game
+        self.assertIsNone(m.quiz)
+        press(a, pygame.K_RETURN)  # Enter starts it too
+        self.assertIsNotNone(m.quiz)
+
+    def test_state_flags_game_has_a_leaderboard(self):
+        a = app()
+        a.set_mode("flags_game")
+        self.assertIsNone(a.mode_obj.board())  # only the State Flags game has one
+        a.set_mode("us_flags_game")
+        m = a.mode_obj
+        self.assertEqual(m.board().field, "flags")
+        a.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=a.leaderboard_btn.rect.center))
+        self.assertEqual(a.modal, "leaderboard")
+        a.frame(0.016)
+        press(a, pygame.K_ESCAPE)
+        self.assertIsNone(a.modal)
+        if not m.quiz:
+            m.start_quiz("game")
+        first = True
+        while not m.quiz.done:
+            q = m.quiz
+            right = q.choices.index(q.answer)
+            m.pick((right + 1) % 4 if first else right)  # one wrong answer
+            first = False
+            q.elapsed_ms += 1000  # a second per flag
+            m.next_question()
+        self.assertEqual(a.result, {"flags": 49, "seconds": 50.0})
+        self.assertEqual(a.modal, "name")
+        a.frame(0.016)
+        a.name_text = ""
+        type_text(a, "Tester")
+        press(a, pygame.K_RETURN)
+        self.assertEqual(a.modal, "scores")
+        a.frame(0.016)
+        saved, _ = storage.load_scores(*m.board().files)
+        self.assertIn(("Tester", 49, 50.0), [(sc["name"], sc["flags"], sc["seconds"]) for sc in saved])
+        self.assertTrue(os.path.exists(config.STATE_FLAG_SCORES_FILE))
+        a.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=a.again_btn.rect.center))
+        self.assertIsNone(a.modal)  # Play again: a new game
+        self.assertFalse(m.quiz.done)
+        self.assertEqual(m.quiz.index, 1)
+        while not m.quiz.done:  # finish again, skip the name, and close the Top 10 with "View map"
+            m.pick(m.quiz.choices.index(m.quiz.answer))
+            m.next_question()
+        press(a, pygame.K_ESCAPE)
+        self.assertEqual(a.modal, "scores")
+        a.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=a.close_btn.rect.center))
+        a.frame(0.016)
+        self.assertIsNone(m.quiz)  # straight back to the map: no "Finished!" card as well
+        a.set_mode("states")  # the States game's board is still its own
+        self.assertEqual(a.mode_obj.board().field, "states")
+        shown = []
+
+        class Spy:  # a font that remembers what it drew
+            def __init__(self, font):
+                self.font = font
+
+            def render(self, text, *rest):
+                shown.append(text)
+                return self.font.render(text, *rest)
+
+        small, a.small = a.small, Spy(a.small)
+        a.new_score = {"flags": 3, "seconds": 999.0}  # a State Flags score that didn't make its top 10...
+        a.modal = "leaderboard"
+        try:
+            a.draw_scoreboard()
+        finally:
+            a.small, a.modal, a.new_score = small, None, None
+        self.assertTrue(shown)
+        self.assertFalse(any("top 10" in t for t in shown))  # ...isn't mentioned on the States game's board
 
 if __name__ == "__main__":
     unittest.main()

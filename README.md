@@ -24,12 +24,13 @@ start screen (your game in progress is kept, and its clock pauses).
 | Mode | Learn | Game |
 |---|---|---|
 | States | Hover over a state to see its name and flag | Type all 50 states in 5 minutes |
-| State Flags | Hover over a state to see its flag, or take a practice test | Pick the right flag for all 50 states |
+| State Flags | Hover over a state to see its flag, or take a practice test | Pick the right flag for all 50 states, against the clock |
 | State Capitals | Hover over a state to see its capital, or take a practice test | Pick the right capital for all 50 states |
 | Guess the State | | A state is highlighted: type its name. One try per state, 5 minutes. |
 | Guess the Capital | | A state is highlighted: type its capital. One try per state, 5 minutes. |
 
-The timed games (Countries, States, Guess the State and Guess the Capital) each have their own top 10 leaderboard.
+Countries, States, Guess the State, Guess the Capital and the State Flags game each have their own top 10
+leaderboard: most right answers first, and the faster time wins a tie.
 
 ![Guess the State](screenshots/guess-the-state.png)
 ![Flags Game](screenshots/flags-game.png)

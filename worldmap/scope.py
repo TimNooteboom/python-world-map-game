@@ -1,8 +1,16 @@
 """A scope is one map you can play on (the world, or the USA) with its own game in progress."""
 
-from .config import (CAPITAL_GUESS_SCORES_FILE, CONTINENT_VIEWS, GUESS_SCORES_FILE, SCORES_FILE, STATE_SCORES_FILE,
-                     STATE_TIME_LIMIT, TIME_LIMIT, USA_VIEW, starting_scores)
+from collections import namedtuple
+
+from .config import (CAPITAL_GUESS_SCORES_FILE, CONTINENT_VIEWS, GUESS_SCORES_FILE, SCORES_FILE, STATE_FLAG_SCORES_FILE,
+                     STATE_SCORES_FILE, STATE_TIME_LIMIT, TIME_LIMIT, USA_VIEW, starting_scores)
 from .data import State, load_countries, load_state_features
+
+# A Top 10 leaderboard: files = (the player's saved scores, the bundled starting scores), its title, the heading
+# of its count column, and the key a saved score uses for that count ("countries", "states", "capitals", "flags").
+Board = namedtuple("Board", "files title label field")
+STATE_FLAGS_BOARD = Board((STATE_FLAG_SCORES_FILE, starting_scores("state_flag_scores.json")),
+                          "Top 10 State Flags", "Correct", "flags")
 
 
 class Scope:
@@ -12,10 +20,11 @@ class Scope:
         self.key, self.countries, self.views = key, countries, views
         self.has_world = key == "world"  # the world has a globe view with continents to zoom into
         self.noun, self.nouns = noun, nouns  # "country"/"countries" or "state"/"states"
-        self.time_limit, self.score_files, self.board_title = time_limit, score_files, board_title
-        self.score_label = score_label or nouns.title()  # scoreboard column: "Countries", "States", "Correct"
-        # Key a saved score uses for the count: "countries", "states" (States game, Guess the State) or "capitals".
-        self.score_field = {"world": "countries", "guess_capital": "capitals"}.get(key, "states")
+        self.time_limit = time_limit
+        # The leaderboard of this map's timed game. Its count is saved as "countries", "states" (States game,
+        # Guess the State) or "capitals"; the column says "Countries", "States" or "Correct".
+        field = {"world": "countries", "guess_capital": "capitals"}.get(key, "states")
+        self.board = Board(score_files, board_title, score_label or nouns.title(), field)
         self.progress_prefix = "" if self.has_world else "us_"
         # Game in progress (see App.reset_game_state), kept while you play other modes.
         self.continent = None  # None = world view

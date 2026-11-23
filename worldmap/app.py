@@ -63,7 +63,7 @@ class App(WidgetsMixin, LabelsMixin, ScoreboardMixin, MenuMixin, SplashMixin):
         self.menu_group = None  # menu group expanded to show Learn / Game (a group key in MENU)
         self.home_btn = Button("Home", (20, 14, 90, 40))  # back to the start screen
         self.modes_btn = Button("Modes", (120, 14, 130, 40))
-        self.leaderboard_btn = Button("Leaderboard", (260, 14, 160, 40))  # timed games only
+        self.leaderboard_btn = Button("Leaderboard", (260, 14, 160, 40))  # games with a Top 10
         self.lb_close_btn = Button("Close", (self.card.centerx - 70, self.card.bottom - 60, 140, 40))
         self.flag_reset_btn = Button("Reset", (WIDTH - 200, 14, 180, 40))  # flag / capital games
         self.perfect = load_progress()  # continents with every flag / capital right: green on the map
@@ -297,13 +297,13 @@ class App(WidgetsMixin, LabelsMixin, ScoreboardMixin, MenuMixin, SplashMixin):
             self.mode_obj.handle_event(event)
 
     def handle_top_button(self, event):
-        """Home, Leaderboard (timed games) and Reset (flag / capital games) buttons. True if clicked."""
+        """Home, Leaderboard (games with a Top 10) and Reset (flag / capital games) buttons. True if clicked."""
         if event.type != pygame.MOUSEBUTTONDOWN or event.button != 1:
             return False
         if self.home_btn.rect.collidepoint(event.pos):
             self.go_home()
             return True
-        if self.mode_obj.timed and self.leaderboard_btn.rect.collidepoint(event.pos):
+        if self.mode_obj.board() and self.leaderboard_btn.rect.collidepoint(event.pos):
             self.modal = "leaderboard"
             return True
         if self.mode_obj.show_reset() and self.flag_reset_btn.rect.collidepoint(event.pos):
@@ -334,9 +334,9 @@ class App(WidgetsMixin, LabelsMixin, ScoreboardMixin, MenuMixin, SplashMixin):
         if not self.anim and self.continent is not None and not self.quiz:
             self.draw_title()  # zoomed in / USA map (a running flag or capital quiz shows its question there instead)
         if not self.anim and not self.modal:
-            if self.mode_obj.timed:
+            if self.mode_obj.board():
                 self.leaderboard_btn.draw(self.screen, self.font)
-            elif self.mode_obj.show_reset():
+            if self.mode_obj.show_reset():
                 confirm = pygame.time.get_ticks() < self.reset_confirm_until
                 self.flag_reset_btn.text = "Confirm?" if confirm else "Reset"
                 self.flag_reset_btn.draw(self.screen, self.font)
